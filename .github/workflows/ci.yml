@@ -1,12 +1,13 @@
 name: CI — Build & Test
 
 on:
-  push:
-    branches-ignore:
-      - main
   pull_request:
-    branches-ignore:
+    branches:
       - main
+      - develop
+  push:
+    branches:
+      - develop
 
 jobs:
   build-and-test:
