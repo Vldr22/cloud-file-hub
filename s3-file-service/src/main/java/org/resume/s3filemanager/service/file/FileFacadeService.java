@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.audit.AuditOperation;
 import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
-import org.resume.s3filemanager.constant.ErrorMessages;
 import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.constant.ValidationMessages;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
@@ -15,6 +14,7 @@ import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
 import org.resume.s3filemanager.properties.FileUploadProperties;
+import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
 import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.resume.s3filemanager.validation.FileValidator;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -49,6 +49,7 @@ public class FileFacadeService {
     private final FileValidator fileValidator;
     private final FileUploadProperties fileUploadProperties;
     private final OutboxService outboxService;
+    private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
 
     /**
      * Загружает один файл с проверкой прав пользователя.
@@ -241,24 +242,7 @@ public class FileFacadeService {
     }
 
     private MultipleUploadResponse createExceptionErrorResponse(MultipartFile file, Exception e) {
-        String errorMessage = switch (e) {
-            case DuplicateFileException ignored -> {
-                log.warn("Duplicate file: {}", file.getOriginalFilename());
-                yield ErrorMessages.FILE_ALREADY_BEEN_UPLOADED;
-            }
-            case FileReadException ignored -> {
-                log.error("File read error: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.FILE_READ_ERROR;
-            }
-            case S3YandexException ignored -> {
-                log.error("S3 storage error: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.FILE_STORAGE_ERROR;
-            }
-            default -> {
-                log.error("Unexpected error uploading file: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.UNEXPECTED_ERROR;
-            }
-        };
+        String errorMessage = errorResponseStrategyResolver.getStrategy(e).handle(file.getOriginalFilename(), e);
 
         return new MultipleUploadResponse(
                 CommonResponseStatus.ERROR,
