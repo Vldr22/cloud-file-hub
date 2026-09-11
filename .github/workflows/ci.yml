@@ -1,12 +1,13 @@
 name: CI — Build & Test
 
 on:
-  push:
-    branches-ignore:
-      - main
   pull_request:
-    branches-ignore:
+    branches:
       - main
+      - develop
+  push:
+    branches:
+      - develop
 
 jobs:
   build-and-test:
@@ -15,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
