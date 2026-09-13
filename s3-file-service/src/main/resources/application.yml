@@ -68,7 +68,8 @@ app:
     batch-size: 10
     max-retry-count: 3
     base-backoff-minutes: 5
-    scheduler-interval-ms: 30000
+    scheduler-interval-ms: 30000 # 30 секунд
+    lock-at-most-for: 3m # при худшем сценарии - 3 минуты
 
 # === Kafka Topics ===
 kafka:

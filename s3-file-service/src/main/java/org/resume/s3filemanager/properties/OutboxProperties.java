@@ -1,11 +1,14 @@
 package org.resume.s3filemanager.properties;
 
 import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
+
+import java.time.Duration;
 
 @Getter
 @Validated
@@ -26,4 +29,8 @@ public class OutboxProperties {
 
     @Positive
     private final long schedulerIntervalMs;
+
+    @NotNull
+    private final Duration lockAtMostFor;
+
 }
