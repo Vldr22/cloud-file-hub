@@ -35,7 +35,7 @@ public class OpenApiConfig {
     private static final String API_TITLE = "CloudFileHub API";
     private static final String API_VERSION = "1.0";
     private static final String CONTACT_NAME = "Vladimir — GitHub";
-    private static final String CONTACT_URL = "https://github.com/Vldr22/CloudFileHub";
+    private static final String CONTACT_URL = "https://github.com/Vldr22/cloud-file-hub";
     private static final String DESCRIPTION_PATH = "/swagger-description.md";
     private static final String JWT_DESCRIPTION = "JWT токен, полученный через POST /api/auth/login";
 

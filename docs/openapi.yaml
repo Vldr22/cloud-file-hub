@@ -1,0 +1,1870 @@
+openapi: 3.0.1
+info:
+  title: CloudFileHub API
+  description: |-
+    Файловый хостинг с S3 хранилищем, JWT-аутентификацией и антивирусным сканированием.
+
+    ---
+
+    **Аутентификация**
+    * Публичный доступ — просмотр списка файлов и скачивание без регистрации
+    * Вход через `POST /api/auth/login` — JWT токен устанавливается в HttpOnly cookie
+    * Все остальные защищённые endpoints требуют валидный JWT токен в cookie
+
+    ---
+
+    **Уровни доступа**
+    * `ROLE_USER` — загрузка 1 файла, удаление только своих файлов
+    * `ROLE_ADMIN` — загрузка до 5 файлов, удаление любых файлов, управление пользователями, просмотр аудит-логов и статистики
+    * Публичный доступ — просмотр и скачивание файлов без регистрации
+
+    ---
+
+    **Формат ответов**
+
+    Все endpoints возвращают `CommonResponse<T>`:
+    ```json
+    {
+      "data": {},
+      "status": "SUCCESS",
+      "timestamp": "2026-03-11T03:41:17.639342344"
+    }
+    ```
+
+    Ответ с ошибкой:
+    ```json
+    {
+      "status": "ERROR",
+      "problemDetail": {
+        "type": "about:blank",
+        "title": "Not Found",
+        "status": 404,
+        "detail": "File not found"
+      },
+      "timestamp": "2026-03-11T03:41:17.639342344"
+    }
+    ```
+
+    ---
+    **Ошибки**
+    * `400` — ошибка валидации или неверный тип параметра
+    * `401` — токен отсутствует или истёк
+    * `403` — недостаточно прав или лимит загрузки исчерпан
+    * `404` — файл или пользователь не найден
+    * `409` — конфликт (username уже занят, файл дублируется)
+    * `413` — файл превышает максимальный размер (30MB)
+    * `500` — ошибка S3 или внутренняя ошибка сервера
+  contact:
+    name: Vladimir — GitHub
+    url: https://github.com/Vldr22/cloud-file-hub
+  version: "1.0"
+servers:
+- url: https://cloudfilehub.duckdns.org
+  description: Production (VPS)
+security:
+- Bearer Authentication: []
+tags:
+- name: Home
+  description: Публичный доступ к списку файлов без аутентификации
+- name: Admin
+  description: "Администрирование пользователями, файлами и логами"
+- name: Admin
+  description: "Управление пользователями, файлами и аудит-логами — только для адм\
+    инистратора"
+- name: Home
+  description: Домашняя страница. Публичный доступ к списку файлов
+- name: Auth
+  description: "Регистрация, вход и выход из системы"
+- name: Files
+  description: "Загрузка, скачивание и удаление файлов"
+paths:
+  /api/admin/users/{userId}/status:
+    put:
+      tags:
+      - Admin
+      summary: Изменить статус пользователя
+      description: Меняет статус (ACTIVE/BLOCKED). При блокировке инвалидирует токен
+      operationId: changeUserStatus
+      parameters:
+      - name: userId
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      - name: status
+        in: query
+        description: Новый статус
+        required: true
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - BLOCKED
+        example: BLOCKED
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Статус изменён
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
+  /api/admin/users/{userId}/file-upload-status:
+    put:
+      tags:
+      - Admin
+      summary: Изменить статус загрузки
+      description: Меняет лимит загрузки файлов (UNLIMITED/NOT_UPLOADED/FILE_UPLOADED)
+      operationId: changeUserFileUploadStatus
+      parameters:
+      - name: userId
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      - name: uploadStatus
+        in: query
+        description: Новый статус загрузки
+        required: true
+        schema:
+          type: string
+          enum:
+          - UNLIMITED
+          - NOT_UPLOADED
+          - FILE_UPLOADED
+        example: UNLIMITED
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Статус изменён
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
+  /api/files/upload:
+    post:
+      tags:
+      - Files
+      summary: Загрузить файл
+      description: "Загружает один файл. Обычные пользователи — только 1 файл, адм\
+        ины — без ограничений"
+      operationId: upload
+      requestBody:
+        content:
+          application/json:
+            schema:
+              required:
+              - file
+              type: object
+              properties:
+                file:
+                  type: string
+                  description: Файл для загрузки
+                  format: binary
+      responses:
+        "409":
+          description: Файл уже существует
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Лимит загрузки исчерпан или пользователь заблокирован
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Неверный тип или формат файла
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Файл превышает 30MB
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "201":
+          description: Файл загружен
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseString"
+  /api/files/multiple-upload:
+    post:
+      tags:
+      - Files
+      summary: Множественная загрузка
+      description: Загружает до 5 файлов. Только для администраторов
+      operationId: multipleUpload
+      parameters:
+      - name: files
+        in: query
+        description: Файлы для загрузки (до 5)
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: binary
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Все файлы не прошли загрузку или превышен лимит файлов
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "201":
+          description: Хотя бы один файл загружен успешно (частичный успех возможен)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseListMultipleUploadResponse"
+  /api/auth/register:
+    post:
+      tags:
+      - Auth
+      summary: Регистрация
+      description: Создаёт нового пользователя с ролью USER
+      operationId: register
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+        required: true
+      responses:
+        "409":
+          description: Пользователь с таким именем уже зарегистрирован
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "201":
+          description: Пользователь создан
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseString"
+      security: []
+  /api/auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Выйти из системы
+      description: Удаляет токен из whitelist и очищает cookie
+      operationId: logout
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешный выход
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseString"
+  /api/auth/login:
+    post:
+      tags:
+      - Auth
+      summary: Войти в систему
+      description: Проверяет данные и устанавливает JWT Token в cookie
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+        required: true
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Ошибка валидации
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Неверные учётные данные
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешный вход
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseLoginResponse"
+      security: []
+  /api/admin/files/{fileId}/retry-scan:
+    post:
+      tags:
+      - Admin
+      summary: Повторить сканирование файла
+      description: Отправляет файл на повторное сканирование. Только для статуса ERROR
+      operationId: retryScan
+      parameters:
+      - name: fileId
+        in: path
+        description: ID файла
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Файл не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Файл не в статусе ERROR
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Файл отправлен на сканирование
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseAdminFileResponse"
+  /api/admin/files/retry-dlt:
+    post:
+      tags:
+      - Admin
+      summary: Повторить обработку DLT
+      description: Переотправляет все сообщения из Dead Letter Topic для файлов со
+        статусом ERROR
+      operationId: retryDlt
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Сообщения переотправлены
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseInteger"
+  /api/admin/audit-logs:
+    post:
+      tags:
+      - Admin
+      summary: Журнал аудита
+      description: "Возвращает логи с фильтрацией по пользователю, операции, стату\
+        су и дате"
+      operationId: getAuditLogs
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuditLogFilter"
+        required: true
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAuditLogResponse"
+  /api/home:
+    get:
+      tags:
+      - Home
+      summary: Список файлов
+      description: Постраничный список всех файлов без аутентификации
+      operationId: getFiles
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Неверные параметры пагинации
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageFileResponse"
+      security: []
+  /api/files/{uniqueName}:
+    get:
+      tags:
+      - Files
+      summary: Скачать файл
+      description: Скачивает файл по уникальному имени
+      operationId: download
+      parameters:
+      - name: uniqueName
+        in: path
+        description: Уникальное имя файла
+        required: true
+        schema:
+          type: string
+        example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Файл не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Ошибка S3
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Unauthorized
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Файл успешно скачан
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+      security: []
+    delete:
+      tags:
+      - Files
+      summary: Удалить файл
+      description: "Удаляет файл по уникальному имени. Пользователи — только свои\
+        , админы — любые"
+      operationId: delete
+      parameters:
+      - name: uniqueName
+        in: path
+        description: Уникальное имя файла
+        required: true
+        schema:
+          type: string
+        example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Нет прав на удаление чужого файла
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Файл не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "204":
+          description: Файл удалён
+  /api/admin/users:
+    get:
+      tags:
+      - Admin
+      summary: Список пользователей
+      description: Возвращает всех пользователей с пагинацией
+      operationId: getUsers
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageUserDetailsResponse"
+  /api/admin/files/stats:
+    get:
+      tags:
+      - Admin
+      summary: Статистика файлов
+      description: Количество файлов по каждому статусу сканирования
+      operationId: getFileStats
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseFileStatsResponse"
+  /api/admin/files/scan-status:
+    get:
+      tags:
+      - Admin
+      summary: Файлы по статусу сканирования
+      description: Возвращает файлы с указанным статусом (PENDING_SCAN/CLEAN/INFECTED/ERROR)
+      operationId: getFilesByScanStatus
+      parameters:
+      - name: scanStatus
+        in: query
+        description: Статус сканирования
+        required: true
+        schema:
+          type: string
+          enum:
+          - PENDING_SCAN
+          - CLEAN
+          - INFECTED
+          - ERROR
+        example: CLEAN
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PageAdminFileResponse"
+    delete:
+      tags:
+      - Admin
+      summary: Удалить файлы по статусу
+      description: "Для INFECTED — только метаданные (S3 уже очищен). Для остальны\
+        х — удаляет и из S3, и метаданные"
+      operationId: deleteFilesByScanStatus
+      parameters:
+      - name: scanStatus
+        in: query
+        description: Статус сканирования
+        required: true
+        schema:
+          type: string
+          enum:
+          - PENDING_SCAN
+          - CLEAN
+          - INFECTED
+          - ERROR
+        example: INFECTED
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "204":
+          description: Файлы удалены
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseInteger"
+  /api/admin/users/{userId}:
+    delete:
+      tags:
+      - Admin
+      summary: Удалить пользователя
+      description: Удаляет пользователя и инвалидирует его токен
+      operationId: deleteUser
+      parameters:
+      - name: userId
+        in: path
+        description: ID пользователя
+        required: true
+        schema:
+          type: integer
+          format: int64
+        example: 1
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Пользователь не найден
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "204":
+          description: Пользователь удалён
+components:
+  schemas:
+    CommonResponseVoid:
+      type: object
+      properties:
+        data:
+          type: object
+          description: Данные ответа
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        properties:
+          type: object
+          additionalProperties:
+            type: object
+      description: Детали ошибки (только при ERROR)
+    CommonResponseUserDetailsResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/UserDetailsResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    UserDetailsResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID пользователя
+          format: int64
+          example: 1
+        username:
+          type: string
+          description: Имя пользователя
+          example: Sara
+        role:
+          type: string
+          description: Роль пользователя
+          example: ROLE_USER
+          enum:
+          - ADMIN
+          - USER
+        status:
+          type: string
+          description: Статус аккаунта
+          example: ACTIVE
+          enum:
+          - ACTIVE
+          - BLOCKED
+        uploadStatus:
+          type: string
+          description: Статус загрузки файлов
+          example: NOT_UPLOADED
+          enum:
+          - UNLIMITED
+          - NOT_UPLOADED
+          - FILE_UPLOADED
+      description: Информация о пользователе
+    CommonResponseString:
+      type: object
+      properties:
+        data:
+          type: string
+          description: Данные ответа
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    CommonResponseListMultipleUploadResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          description: Данные ответа
+          items:
+            $ref: "#/components/schemas/MultipleUploadResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    MultipleUploadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Статус загрузки
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        originalFileName:
+          type: string
+          description: Оригинальное имя файла
+          example: photo.png
+        uniqueName:
+          type: string
+          description: Уникальное имя файла в хранилище
+          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+        message:
+          type: string
+          description: Сообщение об ошибке
+          example: File already been uploaded
+      description: Результат загрузки одного файла из batch-запроса
+    AuthRequest:
+      required:
+      - password
+      - username
+      type: object
+      properties:
+        username:
+          maxLength: 50
+          minLength: 3
+          type: string
+          description: Имя пользователя
+          example: Sara
+        password:
+          maxLength: 50
+          minLength: 3
+          type: string
+          description: Пароль
+          example: secret123
+      description: Запрос на аутентификацию
+    CommonResponseLoginResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/LoginResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT токен
+          example: eyJhbGciOiJIUzI1NiJ9...
+        login:
+          type: string
+          description: Имя пользователя
+          example: Sara
+        role:
+          type: string
+          description: Роль пользователя
+          example: ROLE_USER
+      description: Ответ при успешной аутентификации
+    AdminFileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID файла
+          format: int64
+          example: 1
+        fileName:
+          type: string
+          description: Оригинальное имя файла
+          example: photo.png
+        uniqueName:
+          type: string
+          description: Уникальное имя файла в хранилище
+          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+        fileSize:
+          type: string
+          description: Размер файла
+          example: 1.03 MB
+        type:
+          type: string
+          description: MIME тип файла
+          example: image/png
+        scanStatus:
+          type: string
+          description: Статус антивирусной проверки
+          example: CLEAN
+          enum:
+          - PENDING_SCAN
+          - CLEAN
+          - INFECTED
+          - ERROR
+        uploadedUserName:
+          type: string
+          description: Имя пользователя загрузившего файл
+          example: Sara
+      description: Расширенная информация о файле для администратора
+    CommonResponseAdminFileResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/AdminFileResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    CommonResponseInteger:
+      type: object
+      properties:
+        data:
+          type: integer
+          description: Данные ответа
+          format: int32
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    AuditLogFilter:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Имя пользователя
+          example: Sara
+        operation:
+          type: string
+          description: Тип операции
+          example: FILE_UPLOAD
+          enum:
+          - REGISTER
+          - FILE_UPLOAD
+          - FILE_DOWNLOAD
+          - FILE_DELETE
+        status:
+          type: string
+          description: Статус операции
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        from:
+          type: string
+          description: Начало периода
+          format: date-time
+        to:
+          type: string
+          description: Начало периода
+          format: date-time
+      description: Фильтр для получения аудит-логов
+    AuditLogResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID записи
+          format: int64
+          example: 1
+        requestId:
+          type: string
+          description: ID запроса
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          description: Имя пользователя
+          example: Sara
+        ipAddress:
+          type: string
+          description: IP адрес
+          example: 127.0.0.1
+        operation:
+          type: string
+          description: Тип операции
+          example: FILE_UPLOAD
+          enum:
+          - REGISTER
+          - FILE_UPLOAD
+          - FILE_DOWNLOAD
+          - FILE_DELETE
+        resourceType:
+          type: string
+          description: Тип ресурса
+          example: FILE
+          enum:
+          - FILE
+          - USER
+          - UNKNOWN
+        resourceId:
+          type: string
+          description: ID ресурса
+          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+        status:
+          type: string
+          description: Статус операции
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        details:
+          type: string
+          description: Детали операции при Error
+          example: Duplicate file. File already exists
+        timestamp:
+          type: string
+          description: Время операции
+          format: date-time
+      description: Запись аудит-лога
+    PageAuditLogResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageableObject:
+      type: object
+      properties:
+        paged:
+          type: boolean
+        pageNumber:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        unpaged:
+          type: boolean
+    SortObject:
+      type: object
+      properties:
+        sorted:
+          type: boolean
+        empty:
+          type: boolean
+        unsorted:
+          type: boolean
+    FileResponse:
+      type: object
+      properties:
+        fileName:
+          type: string
+          description: Оригинальное имя файла
+          example: photo.png
+        uniqueName:
+          type: string
+          description: Уникальное имя файла в хранилище
+          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+        fileSize:
+          type: string
+          description: Размер файла
+          example: 1.03 MB
+      description: Информация о файле
+    PageFileResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    PageUserDetailsResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserDetailsResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+    CommonResponseFileStatsResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FileStatsResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+      description: Общий формат ответа API
+    FileStatsResponse:
+      type: object
+      properties:
+        pending:
+          type: integer
+          description: Файлы ожидающие проверки
+          format: int64
+          example: 5
+        clean:
+          type: integer
+          description: Чистые файлы
+          format: int64
+          example: 100
+        infected:
+          type: integer
+          description: Заражённые файлы
+          format: int64
+          example: 2
+        error:
+          type: integer
+          description: Файлы с ошибкой проверки
+          format: int64
+          example: 1
+        total:
+          type: integer
+          description: Всего файлов
+          format: int64
+          example: 108
+      description: Статистика файлов по статусам антивирусной проверки
+    PageAdminFileResponse:
+      type: object
+      properties:
+        totalPages:
+          type: integer
+          format: int32
+        totalElements:
+          type: integer
+          format: int64
+        pageable:
+          $ref: "#/components/schemas/PageableObject"
+        first:
+          type: boolean
+        last:
+          type: boolean
+        size:
+          type: integer
+          format: int32
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminFileResponse"
+        number:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/SortObject"
+        numberOfElements:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+  securitySchemes:
+    Bearer Authentication:
+      type: http
+      description: "JWT токен, полученный через POST /api/auth/login"
+      scheme: bearer
+      bearerFormat: JWT
