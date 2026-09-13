@@ -5,23 +5,21 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.resume.common.model.ScanStatus;
-import org.resume.s3filemanager.audit.AuditOperation;
 import org.resume.s3filemanager.dto.*;
-import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.service.admin.AdminAuditService;
 import org.resume.s3filemanager.service.admin.AdminFileService;
 import org.resume.s3filemanager.service.admin.AdminUserService;
 import org.resume.s3filemanager.service.kafka.RetryDLTService;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.time.Instant;
 
 /**
  * REST контроллер для административных операций.
@@ -48,15 +46,10 @@ public class AdminController {
     })
     @Parameter(name = "page", description = "Номер страницы", example = "0")
     @Parameter(name = "size", description = "Размер страницы", example = "20")
-    @GetMapping("/audit-logs")
+    @PostMapping("/audit-logs")
     public Page<AuditLogResponse> getAuditLogs(
-            @Parameter(description = "Имя пользователя", example = "john_doe") @RequestParam(required = false) String username,
-            @Parameter(description = "Тип операции", example = "FILE_UPLOAD") @RequestParam(required = false) AuditOperation operation,
-            @Parameter(description = "Статус операции", example = "SUCCESS") @RequestParam(required = false) CommonResponseStatus status,
-            @Parameter(description = "Начало периода", example = "2026-03-11T03:41:17.639342344") @RequestParam(required = false) Instant from,
-            @Parameter(description = "Конец периода", example = "2026-03-11T03:41:17.639342344") @RequestParam(required = false) Instant to,
+            @Valid @ParameterObject AuditLogFilter filter,
             @Parameter(hidden = true) Pageable pageable) {
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(username, operation, status, from, to);
         return adminAuditService.getAuditLogs(filter, pageable);
     }
 

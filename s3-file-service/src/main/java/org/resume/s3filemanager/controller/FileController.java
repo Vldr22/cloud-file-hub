@@ -12,6 +12,7 @@ import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.service.file.FileFacadeService;
+import org.resume.s3filemanager.validation.ValidBatchSize;
 import org.resume.s3filemanager.validation.ValidFile;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
@@ -47,7 +48,7 @@ public class FileController {
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Лимит загрузки исчерпан или пользователь заблокирован"),
             @ApiResponse(responseCode = "409", description = "Файл уже существует"),
-            @ApiResponse(responseCode = "413", description = "Файл превышает 30MB")
+            @ApiResponse(responseCode = "413", description = "Файл превышает ${spring.servlet.multipart.max-file-size}")
     })  @PostMapping("/upload")
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<String> upload (
@@ -57,7 +58,8 @@ public class FileController {
         return CommonResponse.success(SuccessMessages.FILE_UPLOAD_SUCCESS);
     }
 
-    @Operation(summary = "Множественная загрузка", description = "Загружает до 5 файлов. Только для администраторов")
+    @Operation(summary = "Множественная загрузка",
+            description = "Загружает до ${app.multiple-upload.max-batch-size} файлов. Только для администраторов")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Хотя бы один файл загружен успешно (частичный успех возможен)"),
             @ApiResponse(responseCode = "400", description = "Все файлы не прошли загрузку или превышен лимит файлов"),
@@ -67,8 +69,8 @@ public class FileController {
     @PostMapping("/multiple-upload")
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<List<MultipleUploadResponse>> multipleUpload(
-            @Parameter(description = "Файлы для загрузки (до 5)", required = true)
-            @RequestParam("files") MultipartFile[] files) {
+            @Parameter(description = "Файлы для загрузки (до ${app.multiple-upload.max-batch-size})", required = true)
+            @RequestParam("files") @ValidBatchSize MultipartFile[] files) {
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(files);
         return CommonResponse.success(results);
     }

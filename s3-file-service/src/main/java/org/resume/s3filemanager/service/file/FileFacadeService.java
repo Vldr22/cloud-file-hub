@@ -5,19 +5,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.audit.AuditOperation;
 import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
-import org.resume.s3filemanager.constant.ErrorMessages;
 import org.resume.s3filemanager.constant.SuccessMessages;
-import org.resume.s3filemanager.constant.ValidationMessages;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
-import org.resume.s3filemanager.properties.FileUploadProperties;
+import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
 import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.resume.s3filemanager.validation.FileValidator;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -39,7 +36,6 @@ import java.util.UUID;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@EnableConfigurationProperties(FileUploadProperties.class)
 public class FileFacadeService {
 
     private final FileHashService fileHashService;
@@ -47,8 +43,8 @@ public class FileFacadeService {
     private final FileMetadataService fileMetadataService;
     private final FilePermissionService filePermissionService;
     private final FileValidator fileValidator;
-    private final FileUploadProperties fileUploadProperties;
     private final OutboxService outboxService;
+    private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
 
     /**
      * Загружает один файл с проверкой прав пользователя.
@@ -80,13 +76,11 @@ public class FileFacadeService {
      * невалидные отклоняются с конкретными сообщениями об ошибках. Хотя бы один файл
      * должен быть успешно загружен.
      *
-     * @param files массив загружаемых файлов (максимум 5)
+     * @param files загружаемые файлы; количество ограничено настройкой батча
      * @return список результатов загрузки для каждого файла со статусом и сообщением
-     * @throws TooManyFilesException если количество файлов превышает настроенный максимум
      * @throws MultipleFileUploadException если все файлы не прошли загрузку
      */
     public List<MultipleUploadResponse> multipleUpload(MultipartFile[] files) {
-        validateBatchUpload(files);
         User admin = filePermissionService.checkUploadPermission();
 
         List<MultipleUploadResponse> results = new ArrayList<>();
@@ -211,16 +205,6 @@ public class FileFacadeService {
         }
     }
 
-    private void validateBatchUpload(MultipartFile[] files) {
-        if (files == null || files.length == 0) {
-            throw new IllegalArgumentException(ValidationMessages.FILE_EMPTY);
-        }
-
-        if (files.length > fileUploadProperties.getMaxBatchSize()) {
-            throw new TooManyFilesException(fileUploadProperties.getMaxBatchSize());
-        }
-    }
-
     private MultipleUploadResponse createSuccessResponse(MultipartFile file, String uniqueName) {
         return new MultipleUploadResponse(
                 CommonResponseStatus.SUCCESS,
@@ -241,24 +225,7 @@ public class FileFacadeService {
     }
 
     private MultipleUploadResponse createExceptionErrorResponse(MultipartFile file, Exception e) {
-        String errorMessage = switch (e) {
-            case DuplicateFileException ignored -> {
-                log.warn("Duplicate file: {}", file.getOriginalFilename());
-                yield ErrorMessages.FILE_ALREADY_BEEN_UPLOADED;
-            }
-            case FileReadException ignored -> {
-                log.error("File read error: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.FILE_READ_ERROR;
-            }
-            case S3YandexException ignored -> {
-                log.error("S3 storage error: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.FILE_STORAGE_ERROR;
-            }
-            default -> {
-                log.error("Unexpected error uploading file: {}", file.getOriginalFilename(), e);
-                yield ErrorMessages.UNEXPECTED_ERROR;
-            }
-        };
+        String errorMessage = errorResponseStrategyResolver.getStrategy(e).handle(file.getOriginalFilename(), e);
 
         return new MultipleUploadResponse(
                 CommonResponseStatus.ERROR,
