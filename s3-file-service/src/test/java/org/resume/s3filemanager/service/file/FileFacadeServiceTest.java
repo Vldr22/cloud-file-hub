@@ -67,6 +67,9 @@ class FileFacadeServiceTest {
                     new FileReadErrorStrategy(),
                     new S3YandexErrorStrategy()));
 
+    @Spy
+    private S3KeyGenerator s3KeyGenerator = new S3KeyGenerator();
+
     @InjectMocks
     private FileFacadeService fileFacadeService;
 

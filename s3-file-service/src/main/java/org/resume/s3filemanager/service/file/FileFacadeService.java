@@ -16,7 +16,6 @@ import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResol
 import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.resume.s3filemanager.validation.FileValidator;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -25,7 +24,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Фасадный сервис для работы с файлами.
@@ -45,6 +43,7 @@ public class FileFacadeService {
     private final FileValidator fileValidator;
     private final OutboxService outboxService;
     private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
+    private final S3KeyGenerator s3KeyGenerator;
 
     /**
      * Загружает один файл с проверкой прав пользователя.
@@ -162,7 +161,7 @@ public class FileFacadeService {
      * @return уникальное имя загруженного файла
      */
     private String uploadFileInternal(MultipartFile file, User user) {
-        String uniqueFileName = generateUniqueFileName(file.getOriginalFilename());
+        String uniqueFileName = s3KeyGenerator.generate(file.getOriginalFilename());
         byte[] fileBytes = readFileBytes(file);
         String fileHash = fileHashService.calculateMD5(fileBytes);
 
@@ -252,11 +251,5 @@ public class FileFacadeService {
         } catch (Exception ex) {
             log.error("Failed to rollback S3 upload: {}", fileName, ex);
         }
-    }
-
-    private String generateUniqueFileName(String originalFilename) {
-        String extension = StringUtils.getFilenameExtension(originalFilename);
-        extension = (extension != null && !extension.isBlank()) ? extension : "tmp";
-        return UUID.randomUUID() + "." + extension;
     }
 }
