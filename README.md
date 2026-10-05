@@ -10,46 +10,59 @@
 ![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203.0-85EA2D)
 ![ClamAV](https://img.shields.io/badge/ClamAV-antivirus-EFEF34)
 ![VPS](https://img.shields.io/badge/Deploy-VPS-47A248)
-![CD](https://github.com/Vldr22/CloudFileHub/actions/workflows/cd.yml/badge.svg?style=flat-square)
-![CI](https://github.com/Vldr22/CloudFileHub/actions/workflows/ci.yml/badge.svg?style=flat-square)
+![CD](https://github.com/Vldr22/cloud-file-hub/actions/workflows/cd.yml/badge.svg?style=flat-square)
+![CI](https://github.com/Vldr22/cloud-file-hub/actions/workflows/ci.yml/badge.svg?style=flat-square)
 
 # CloudFileHub
 > 🚀 **Live demo:** https://cloudfilehub.duckdns.org/swagger-ui/index.html
 
 Файловый хостинг на S3 с JWT-аутентификацией, ролевой моделью и асинхронным антивирусным сканированием.
 
-## Архитектура и технологии
-```
-┌─────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│    Nginx    │────▶│  s3-file-service │────▶│  Yandex Object   │
-│  rate limit │     │  Swagger/OpenAPI │     │  Storage (S3)    │
-│    gzip     │     │  PostgreSQL 16   │     └──────────────────┘
-└─────────────┘     │  Redis 7 (JWT)   │
-                    └────────┬─────────┘
-                       Kafka │
-                    ┌────────▼─────────┐     ┌──────────────────┐
-                    │ antivirus-service│────▶│      ClamAV      │  
-                    │ retry + DLT      │     │   (files scan)   │
-                    └──────────────────┘     └──────────────────┘
-```
-## Ключевые особенности
+## Архитектура
 
-- **Публичный доступ** — просмотр и скачивание файлов без регистрации
-- **JWT + Redis** — HttpOnly cookies с whitelist токенов
-- **Двухуровневая проверка** — валидация типа/размера (до 30MB) + антивирус через Kafka
-- **Ролевая модель:**
-    - USER — загрузка 1 файла, удаление только своих файлов
-    - ADMIN — загрузка до 5 файлов, удаление любых файлов, управление пользователями, просмотр аудит-логов и статистики
-- **Rate limiting** — Nginx (auth: 5r/min, upload: 2r/s, api: 10r/s)
+* **Слои** - в `s3-file-service` цепочка `Controller -> Facade -> Service -> Repository`: контроллеры без бизнес-логики, фасад координирует сервисы и собирает ответ.
+* **Асинхронное сканирование** - загрузка не ждёт антивирус: событие уходит в Kafka, `antivirus-service` забирает файл из S3, прогоняет через ClamAV и возвращает вердикт отдельным топиком.
+* **Transactional Outbox** - события пишутся в БД, доставляются в Kafka планировщиком с retry и exponential backoff, поэтому недоступность брокера не теряет событий.
+* **Стратегии вместо ветвлений** - обработка ошибок пакетной загрузки вынесена в `ErrorResponseStrategy`, новый тип ошибки добавляется новой реализацией без правки существующего кода.
+* **Валидация аннотациями** - правила вынесены в собственные ограничения (`@ValidFile`, `@ValidBatchSize`) вместо цепочек проверок в сервисах.
+* **Мгновенный отзыв токенов** - JWT в HttpOnly cookie плюс whitelist в Redis: выход и блокировка пользователя действуют сразу, не дожидаясь истечения срока.
+* **Аудит через AOP** - бизнес-код не знает о журналировании, записи пишутся асинхронно с прокидыванием MDC в фоновый поток.
+
+![Архитектура CloudFileHub](docs/images/architecture.svg)
+
+## Возможности
+
+| Возможность | Аноним | USER | ADMIN |
+|-------------|:------:|:----:|:-----:|
+| Просмотр списка и скачивание | + | + | + |
+| Загрузка файлов | | 1 файл | пакетно |
+| Удаление файлов | | свои | любые |
+| Управление пользователями | | | + |
+| Аудит-логи и статистика | | | + |
+| Повторное сканирование и DLT | | | + |
+
+Ограничения: файл до 30MB, тип проверяется по сигнатуре содержимого, rate limiting на Nginx (`auth` 5r/min, `upload` 2r/s, `api` 10r/s).
 
 **Доступ:**
 - API: https://cloudfilehub.duckdns.org/api/home
 - Swagger UI: https://cloudfilehub.duckdns.org/swagger-ui/index.html
 - Kafka UI: https://cloudfilehub.duckdns.org/kafka-ui/
 
-## API документация
-![Swagger Overview](docs/images/swagger-title-screen.png)
-![Swagger Endpoints](docs/images/swagger-endpoints-screen.png)
+## API
+
+| Метод | Путь | Описание |
+|-------|------|---------|
+| `POST` | `/api/auth/register` | регистрация, роль USER |
+| `POST` | `/api/auth/login` | вход, JWT в HttpOnly cookie |
+| `POST` | `/api/auth/logout` | выход с отзывом токена из whitelist |
+| `GET` | `/api/home` | публичный список проверенных файлов |
+| `GET` | `/api/files/{uniqueName}` | скачивание файла без аутентификации |
+| `POST` | `/api/files/upload` | загрузка файла |
+| `POST` | `/api/files/multiple-upload` | пакетная загрузка, только ADMIN |
+| `DELETE` | `/api/files/{uniqueName}` | удаление своего файла, ADMIN удаляет любой |
+| `*` | `/api/admin/**` | пользователи, аудит-логи, статистика файлов, повторное сканирование и DLT |
+
+Полная спецификация: [docs/openapi.yaml](docs/openapi.yaml). Это снимок, deploy-версия доступна в [Swagger UI](https://cloudfilehub.duckdns.org/swagger-ui/index.html).
 
 ## Тестирование
 
@@ -68,23 +81,12 @@
 
 ## Быстрый старт
 ```bash
-git clone https://github.com/Vldr22/CloudFileHub.git
-cd CloudFileHub
+git clone https://github.com/Vldr22/cloud-file-hub.git
+cd cloud-file-hub
 cp .env.example .env                # заполнить переменные окружения
 ./scripts/docker-build-and-logs.sh  # 1) Собрать, 2) Поднять
 ```
 
-## Структура проекта
-```
-CloudFileHub/
-├── s3-file-service/      # REST API, авторизация, бизнес-логика
-├── antivirus-service/    # Антивирусное сканирование, Kafka retry
-├── common-kafka/         # Общие модели событий
-├── docker-compose.yml
-├── nginx.conf
-├── scripts/
-└── docs/
-```
 ## Roadmap
 
 - [x] Unit и integration тесты
