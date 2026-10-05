@@ -27,7 +27,7 @@ public abstract class BaseIntegrationTest {
     private static final String POSTGRES_IMAGE = "postgres:16-alpine";
     private static final String REDIS_IMAGE = "redis:7-alpine";
     private static final String KAFKA_IMAGE = "confluentinc/cp-kafka:7.6.0";
-    private static final String MINIO_IMAGE = "minio/minio:latest";
+    private static final String MINIO_IMAGE = "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z";
 
     private static final String POSTGRES_DB = "s3filemanager_test";
     private static final String POSTGRES_USER = "test";

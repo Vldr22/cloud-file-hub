@@ -22,7 +22,6 @@ public class ErrorMessages {
     public static final String FILE_READ_ERROR = "Failed to read file";
     public static final String ACCESS_DENIED_DELETE_FILE = "Cannot delete other user's file";
     public static final String FILES_UPLOAD_ERROR = "Failed to upload all added files";
-    public static final String MAX_FILES_EXCEEDED = "Maximum %d files allowed per upload";
 
     // Database
     public static final String DATA_INTEGRITY_UNIQUE = "Record with this data already exists";

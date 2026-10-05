@@ -16,6 +16,9 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    placeholders:
+      admin_name: admin
+      admin_password: 12345
 
   data:
     redis:
@@ -40,10 +43,6 @@ app:
   jwt:
     secretKey: xFy9XTEbsBAZ1tiabhO47dPgsaGPUQmRh6bhiINyfYA=
     expiration: 86400
-
-  admin:
-    name: admin
-    password: admin123
 
   security:
     cookie-secure: false
