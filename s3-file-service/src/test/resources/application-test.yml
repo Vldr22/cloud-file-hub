@@ -33,9 +33,9 @@ spring:
 
 yandex:
   storage:
-    accessKey: minioadmin
-    secretKey: minioadmin
-    endpoint: http://localhost:9000
+    accessKey: test
+    secretKey: test
+    endpoint: http://localhost:9090
     region: ru-central1
     bucketName: test-bucket
 
