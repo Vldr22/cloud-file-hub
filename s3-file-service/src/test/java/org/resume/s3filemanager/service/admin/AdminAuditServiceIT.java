@@ -6,7 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.resume.s3filemanager.BaseIntegrationTest;
 import org.resume.s3filemanager.audit.AuditOperation;
-import org.resume.s3filemanager.dto.AuditLogFilterRequest;
+import org.resume.s3filemanager.dto.AuditLogFilter;
 import org.resume.s3filemanager.dto.AuditLogResponse;
 import org.resume.s3filemanager.entity.AuditLog;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
@@ -56,7 +56,7 @@ class AdminAuditServiceIT extends BaseIntegrationTest {
         saveLog(username, AuditOperation.FILE_UPLOAD, CommonResponseStatus.SUCCESS, Instant.now());
         saveLog(FAKER.name().username(), AuditOperation.FILE_UPLOAD, CommonResponseStatus.SUCCESS, Instant.now());
 
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(
+        AuditLogFilter filter = new AuditLogFilter(
                 username,
                 null,
                 null,
@@ -77,7 +77,7 @@ class AdminAuditServiceIT extends BaseIntegrationTest {
         saveLog(username, AuditOperation.FILE_UPLOAD, CommonResponseStatus.SUCCESS, Instant.now());
         saveLog(username, AuditOperation.FILE_DELETE, CommonResponseStatus.SUCCESS, Instant.now());
 
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(
+        AuditLogFilter filter = new AuditLogFilter(
                 null,
                 AuditOperation.FILE_UPLOAD,
                 null,
@@ -98,7 +98,7 @@ class AdminAuditServiceIT extends BaseIntegrationTest {
         saveLog(username, AuditOperation.FILE_UPLOAD, CommonResponseStatus.SUCCESS, Instant.now());
         saveLog(username, AuditOperation.FILE_UPLOAD, CommonResponseStatus.ERROR, Instant.now());
 
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(
+        AuditLogFilter filter = new AuditLogFilter(
                 null,
                 null,
                 CommonResponseStatus.ERROR,
@@ -125,7 +125,7 @@ class AdminAuditServiceIT extends BaseIntegrationTest {
         Instant from = past.minusSeconds(60);
         Instant to = past.plusSeconds(60);
 
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(
+        AuditLogFilter filter = new AuditLogFilter(
                 null,
                 null,
                 null,
@@ -145,7 +145,7 @@ class AdminAuditServiceIT extends BaseIntegrationTest {
         saveLog(username, AuditOperation.FILE_UPLOAD, CommonResponseStatus.SUCCESS, Instant.now());
         saveLog(username, AuditOperation.FILE_DELETE, CommonResponseStatus.ERROR, Instant.now());
 
-        AuditLogFilterRequest filter = new AuditLogFilterRequest(
+        AuditLogFilter filter = new AuditLogFilter(
                 null,
                 null,
                 null,

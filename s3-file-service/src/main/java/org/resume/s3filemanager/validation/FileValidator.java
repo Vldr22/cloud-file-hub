@@ -42,7 +42,7 @@ public class FileValidator implements ConstraintValidator<ValidFile, MultipartFi
     @Override
     public boolean isValid(MultipartFile file, ConstraintValidatorContext context) {
         Optional<String> error = validateFile(file);
-        return error.map(s -> addViolation(context, s)).orElse(true);
+        return error.map(s -> ConstraintValidatorUtils.addViolation(context, s)).orElse(true);
     }
 
     /**
@@ -106,12 +106,5 @@ public class FileValidator implements ConstraintValidator<ValidFile, MultipartFi
             log.error("Unexpected error during validation: {}", filename, e);
             return Optional.of(ValidationMessages.FILE_PROCESSING_ERROR);
         }
-    }
-
-    private boolean addViolation(ConstraintValidatorContext context, String message) {
-        context.disableDefaultConstraintViolation();
-        context.buildConstraintViolationWithTemplate(message)
-                .addConstraintViolation();
-        return false;
     }
 }

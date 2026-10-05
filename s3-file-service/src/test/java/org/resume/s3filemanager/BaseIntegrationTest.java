@@ -27,7 +27,7 @@ public abstract class BaseIntegrationTest {
     private static final String POSTGRES_IMAGE = "postgres:16-alpine";
     private static final String REDIS_IMAGE = "redis:7-alpine";
     private static final String KAFKA_IMAGE = "confluentinc/cp-kafka:7.6.0";
-    private static final String MINIO_IMAGE = "minio/minio:latest";
+    private static final String S3_IMAGE = "adobe/s3mock:5.2.3";
 
     private static final String POSTGRES_DB = "s3filemanager_test";
     private static final String POSTGRES_USER = "test";
@@ -35,19 +35,22 @@ public abstract class BaseIntegrationTest {
 
     private static final String REDIS_PASSWORD = "test";
 
-    private static final String MINIO_ACCESS_KEY = "minioadmin";
-    private static final String MINIO_SECRET_KEY = "minioadmin";
-    private static final String MINIO_BUCKET = "test-bucket";
-    private static final String MINIO_REGION = "ru-central1";
+    // S3Mock не проверяет ключи, но SDK требует их наличия
+    private static final String S3_ACCESS_KEY = "test";
+    private static final String S3_SECRET_KEY = "test";
+    private static final String S3_BUCKET = "test-bucket";
+    private static final String S3_REGION = "ru-central1";
+    private static final String S3_REGION_ENV = "COM_ADOBE_TESTING_S3MOCK_STORE_REGION";
+    private static final String S3_READINESS_PATH = "/favicon.ico";
 
     private static final int REDIS_PORT = 6379;
-    private static final int MINIO_PORT = 9000;
+    private static final int S3_PORT = 9090;
 
     // CONTAINERS
     static final PostgreSQLContainer<?> POSTGRES;
     static final GenericContainer<?> REDIS;
     static final KafkaContainer KAFKA;
-    static final GenericContainer<?> MINIO;
+    static final GenericContainer<?> S3;
 
     static {
         POSTGRES = new PostgreSQLContainer<>(POSTGRES_IMAGE)
@@ -61,17 +64,15 @@ public abstract class BaseIntegrationTest {
 
         KAFKA = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
 
-        MINIO = new GenericContainer<>(DockerImageName.parse(MINIO_IMAGE))
-                .withCommand("server /data")
-                .withExposedPorts(MINIO_PORT)
-                .withEnv("MINIO_ROOT_USER", MINIO_ACCESS_KEY)
-                .withEnv("MINIO_ROOT_PASSWORD", MINIO_SECRET_KEY)
-                .waitingFor(Wait.forHttp("/minio/health/live").forPort(MINIO_PORT));
+        S3 = new GenericContainer<>(DockerImageName.parse(S3_IMAGE))
+                .withExposedPorts(S3_PORT)
+                .withEnv(S3_REGION_ENV, S3_REGION)
+                .waitingFor(Wait.forHttp(S3_READINESS_PATH).forPort(S3_PORT));
 
         POSTGRES.start();
         REDIS.start();
         KAFKA.start();
-        MINIO.start();
+        S3.start();
     }
 
     @AfterEach
@@ -94,10 +95,10 @@ public abstract class BaseIntegrationTest {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
 
         registry.add("yandex.storage.endpoint",
-                () -> "http://" + MINIO.getHost() + ":" + MINIO.getMappedPort(MINIO_PORT));
-        registry.add("yandex.storage.accessKey", () -> MINIO_ACCESS_KEY);
-        registry.add("yandex.storage.secretKey", () -> MINIO_SECRET_KEY);
-        registry.add("yandex.storage.bucketName", () -> MINIO_BUCKET);
-        registry.add("yandex.storage.region", () -> MINIO_REGION);
+                () -> "http://" + S3.getHost() + ":" + S3.getMappedPort(S3_PORT));
+        registry.add("yandex.storage.accessKey", () -> S3_ACCESS_KEY);
+        registry.add("yandex.storage.secretKey", () -> S3_SECRET_KEY);
+        registry.add("yandex.storage.bucketName", () -> S3_BUCKET);
+        registry.add("yandex.storage.region", () -> S3_REGION);
     }
 }

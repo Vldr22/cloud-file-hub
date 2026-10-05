@@ -96,12 +96,6 @@ public class GlobalExceptionHandler {
         );
     }
 
-    @ExceptionHandler(TooManyFilesException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public CommonResponse<Void> handleTooManyFilesException(TooManyFilesException e) {
-        return createErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage());
-    }
-
     @ExceptionHandler(UserBlockedException.class)
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public CommonResponse<Void> handleUserBlocked(UserBlockedException e) {
