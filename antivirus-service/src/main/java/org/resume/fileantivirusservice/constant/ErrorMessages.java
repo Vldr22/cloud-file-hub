@@ -10,6 +10,7 @@ public class ErrorMessages {
 
     // === S3 Errors ===
     public static final String S3_SERVICE_UNAVAILABLE = "S3 service unavailable";
+    public static final String S3_STREAM_CLOSE_FAILED = "Failed to close S3 file stream";
 
     // === ClamAV Errors ===
     public static final String CLAMAV_UNAVAILABLE = "ClamAV service unavailable";

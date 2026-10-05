@@ -4,10 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.resume.common.model.FileScanResult;
 import org.resume.common.model.FileUploadEvent;
+import org.resume.fileantivirusservice.constant.ErrorMessages;
 import org.resume.fileantivirusservice.consumer.FileUploadConsumer;
+import org.resume.fileantivirusservice.exception.TechnicalException;
 import org.resume.fileantivirusservice.producer.FileScanResultProducer;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.io.InputStream;
 
 /**
@@ -44,8 +47,15 @@ public class FileOrchestrationService {
     public void processFileUpload(FileUploadEvent event) {
         log.info("Processing file upload: fileId={}, s3Key={}", event.getFileId(), event.getS3Key());
 
-        InputStream fileStream = downloadFile(event.getS3Key());
-        FileScanResult scanResult = scanFile(event.getS3Key(), fileStream);
+        FileScanResult scanResult;
+        try (InputStream fileStream = downloadFile(event.getS3Key())) {
+            scanResult = scanFile(event.getS3Key(), fileStream);
+
+        } catch (IOException e) {
+            log.error("Failed to close S3 stream: s3Key={}", event.getS3Key(), e);
+            throw new TechnicalException(ErrorMessages.S3_STREAM_CLOSE_FAILED, e);
+        }
+
         sendScanResult(scanResult);
 
         log.info("File processing completed: fileId={}, status={}",
