@@ -10,6 +10,7 @@ import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.exception.FileNotFoundException;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.service.auth.UserService;
+import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +29,7 @@ public class FileMetadataService {
     private final FileMetadataRepository fileMetadataRepository;
     private final FilePermissionService fileUploadPermissionService;
     private final UserService userService;
+    private final OutboxService outboxService;
 
     /**
      * Сохраняет метаданные файла в базу данных с привязкой к пользователю.
@@ -67,10 +69,15 @@ public class FileMetadataService {
         userService.updateUploadStatus(file.getUser(), FileUploadStatus.NOT_UPLOADED);
     }
 
+    /**
+     * Сохраняет метаданные файла, отмечает загрузку у пользователя и создаёт outbox-событие
+     * в одной транзакции: файл не может оказаться в БД без события на антивирусную проверку.
+     */
     @Transactional
-    public FileMetadata saveFileWithPermission(MultipartFile file, String uniqueFileName, String fileHash, User user) {
+    public FileMetadata saveFileWithOutboxEvent(MultipartFile file, String uniqueFileName, String fileHash, User user) {
         FileMetadata saved = saveDatabaseMetadata(file, uniqueFileName, fileHash, user);
         fileUploadPermissionService.markFileUploaded();
+        outboxService.saveFileUploadEvent(saved, user.getId());
         return saved;
     }
 

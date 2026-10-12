@@ -13,7 +13,6 @@ import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
 import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
-import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.resume.s3filemanager.validation.FileValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,7 +40,6 @@ public class FileFacadeService {
     private final FileMetadataService fileMetadataService;
     private final FilePermissionService filePermissionService;
     private final FileValidator fileValidator;
-    private final OutboxService outboxService;
     private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
     private final S3KeyGenerator s3KeyGenerator;
 
@@ -153,8 +151,8 @@ public class FileFacadeService {
     /**
      * Основная логика загрузки файла без проверки прав.
      * <p>
-     * Реализует паттерн Saga: при ошибке сохранения метаданных
-     * выполняется компенсирующая транзакция (удаление из S3).
+     * При ошибке сохранения метаданных выполняется компенсирующее
+     * удаление файла из S3.
      *
      * @param file загружаемый файл
      * @param user пользователь-владелец файла
@@ -169,10 +167,8 @@ public class FileFacadeService {
         fileStorageService.uploadFileYandexS3(uniqueFileName, fileBytes, file.getContentType());
 
         try {
-            FileMetadata saved = fileMetadataService.saveFileWithPermission(file, uniqueFileName, fileHash, user);
+            fileMetadataService.saveFileWithOutboxEvent(file, uniqueFileName, fileHash, user);
             log.info("File uploaded successfully: {}", uniqueFileName);
-
-            outboxService.saveFileUploadEvent(saved, user.getId());
 
             return uniqueFileName;
         } catch (Exception e) {
