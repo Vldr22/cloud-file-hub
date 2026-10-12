@@ -69,12 +69,10 @@ public class OutboxEventProcessor {
         } else {
             long backoffMinutes = outboxProperties.getBaseBackoffMinutes() * (1L << newRetryCount);
             event.setNextRetryAt(Instant.now().plus(backoffMinutes, ChronoUnit.MINUTES));
-            log.warn("Outbox event failed, retry {}/{} in {} minutes: id={}",
-                    newRetryCount, outboxProperties.getMaxRetryCount(), backoffMinutes, event.getId());
+            log.warn("Outbox event failed, retry {}/{} in {} minutes: id={}, cause={}",
+                    newRetryCount, outboxProperties.getMaxRetryCount(), backoffMinutes, event.getId(), e.getMessage());
         }
 
         outboxRepository.save(event);
-        log.error("Outbox event permanently failed after {} retries: id={}",
-                outboxProperties.getMaxRetryCount(), event.getId(), e);
     }
 }
