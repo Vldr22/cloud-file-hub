@@ -16,6 +16,7 @@ import org.resume.s3filemanager.validation.ValidBatchSize;
 import org.resume.s3filemanager.validation.ValidFile;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -49,7 +50,8 @@ public class FileController {
             @ApiResponse(responseCode = "403", description = "Лимит загрузки исчерпан или пользователь заблокирован"),
             @ApiResponse(responseCode = "409", description = "Файл уже существует"),
             @ApiResponse(responseCode = "413", description = "Файл превышает ${spring.servlet.multipart.max-file-size}")
-    })  @PostMapping("/upload")
+    })
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<String> upload (
             @Parameter(description = "Файл для загрузки", required = true)
@@ -66,7 +68,7 @@ public class FileController {
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Недостаточно прав")
     })
-    @PostMapping("/multiple-upload")
+    @PostMapping(value = "/multiple-upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<List<MultipleUploadResponse>> multipleUpload(
             @Parameter(description = "Файлы для загрузки (до ${app.multiple-upload.max-batch-size})", required = true)
