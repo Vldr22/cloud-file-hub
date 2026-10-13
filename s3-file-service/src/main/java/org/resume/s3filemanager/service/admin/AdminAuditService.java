@@ -2,7 +2,7 @@ package org.resume.s3filemanager.service.admin;
 
 import com.querydsl.core.BooleanBuilder;
 import lombok.RequiredArgsConstructor;
-import org.resume.s3filemanager.dto.AuditLogFilterRequest;
+import org.resume.s3filemanager.dto.AuditLogFilter;
 import org.resume.s3filemanager.dto.AuditLogResponse;
 import org.resume.s3filemanager.entity.AuditLog;
 import org.resume.s3filemanager.entity.QAuditLog;
@@ -27,14 +27,14 @@ public class AdminAuditService {
      * @param pageable параметры пагинации
      * @return страница с записями аудита
      */
-    public Page<AuditLogResponse> getAuditLogs(AuditLogFilterRequest filter, Pageable pageable) {
+    public Page<AuditLogResponse> getAuditLogs(AuditLogFilter filter, Pageable pageable) {
         BooleanBuilder builder = buildFilter(filter);
 
         return auditLogRepository.findAll(builder, pageable)
                 .map(this::toAuditLogResponse);
     }
 
-    private BooleanBuilder buildFilter(AuditLogFilterRequest filter) {
+    private BooleanBuilder buildFilter(AuditLogFilter filter) {
         QAuditLog qAuditLog = QAuditLog.auditLog;
         BooleanBuilder builder = new BooleanBuilder();
 

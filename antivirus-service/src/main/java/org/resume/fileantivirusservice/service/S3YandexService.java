@@ -26,7 +26,7 @@ public class S3YandexService {
      * Скачивает файл из S3 по ключу.
      *
      * @param s3Key уникальный ключ файла в S3
-     * @return InputStream с содержимым файла
+     * @return открытый InputStream с содержимым файла, закрывает вызывающий
      * @throws S3DownloadException если произошла техническая ошибка
      */
     public InputStream downloadFile(String s3Key) {

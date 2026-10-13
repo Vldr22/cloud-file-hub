@@ -33,31 +33,22 @@ public class UserService {
 
     /**
      * Создает нового пользователя с ролью USER.
-     * <p>
-     * Новый пользователь получает статус загрузки NOT_UPLOADED,
-     * что позволяет загрузить один файл.
      *
-     * @param username имя пользователя (уникальное)
-     * @param password пароль в открытом виде (будет зашифрован)
+     * @param password пароль в открытом виде - хеш будет присвоен перед сохранением
      * @throws UserAlreadyExistsException если пользователь с таким именем уже существует
      */
     public void createUser(String username, String password) {
-        createUserWithRole(username, password, UserRole.USER, FileUploadStatus.NOT_UPLOADED);
-    }
+        if (existsByUsername(username)) {
+            throw new UserAlreadyExistsException();
+        }
 
-    /**
-     * Создает нового администратора с ролью ADMIN.
-     * <p>
-     * Администратор получает статус загрузки UNLIMITED,
-     * что позволяет загружать неограниченное количество файлов.
-     *
-     * @param username имя администратора (уникальное)
-     * @param password пароль в открытом виде (будет зашифрован)
-     * @throws UserAlreadyExistsException если пользователь с таким именем уже существует
-     */
-    public void createAdmin(String username, String password) {
-        createUserWithRole(username, password, UserRole.ADMIN, FileUploadStatus.UNLIMITED);
-        log.info("Admin created in DB successfully: {}", username);
+        User user = new User();
+        user.setUsername(username);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(UserRole.USER);
+        user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
+
+        userRepository.save(user);
     }
 
     /**
@@ -108,17 +99,13 @@ public class UserService {
      */
     @Transactional
     public void updateUploadStatus(User user, FileUploadStatus status) {
-        log.info("BEFORE UPDATE: user={}, currentStatus={}, newStatus={}",
-                user.getUsername(), user.getUploadStatus(), status);
 
         if (user.getUploadStatus() == FileUploadStatus.UNLIMITED) {
-            log.warn("SKIPPING: User {} has UNLIMITED status, not changing to {}",
-                    user.getUsername(), status);
+            log.debug("Upload status not changed for {}: user has UNLIMITED", user.getUsername());
             return;
         }
         user.setUploadStatus(status);
         userRepository.save(user);
-        log.info("AFTER UPDATE: user={}, newStatus={}", user.getUsername(), user.getUploadStatus());
     }
 
     public Page<User> findAll(Pageable pageable) {
@@ -145,20 +132,5 @@ public class UserService {
     @Transactional
     public void delete(User user) {
         userRepository.delete(user);
-    }
-
-    private void createUserWithRole(String username, String password,
-                                    UserRole role, FileUploadStatus uploadStatus) {
-        if (existsByUsername(username)) {
-            throw new UserAlreadyExistsException();
-        }
-
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
-        user.setRole(role);
-        user.setUploadStatus(uploadStatus);
-
-        userRepository.save(user);
     }
 }

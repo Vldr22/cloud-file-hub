@@ -1,6 +1,5 @@
 package org.resume.s3filemanager.service.admin;
 
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.dto.AdminFileResponse;
@@ -14,6 +13,7 @@ import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 

@@ -19,9 +19,13 @@ class YandexStorageServiceIT extends BaseIntegrationTest {
 
     private static final Faker FAKER = new Faker();
     private static final String BUCKET = "test-bucket";
+    private static final String ORIGINAL_FILENAME = "document.txt";
 
     @Autowired
     private YandexStorageService storageService;
+
+    @Autowired
+    private S3KeyGenerator s3KeyGenerator;
 
     @Autowired
     private S3Client yandexS3Client;
@@ -32,7 +36,7 @@ class YandexStorageServiceIT extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        fileName = FAKER.file().fileName();
+        fileName = s3KeyGenerator.generate(ORIGINAL_FILENAME);
         content = FAKER.lorem().sentence().getBytes();
         contentType = "text/plain";
 

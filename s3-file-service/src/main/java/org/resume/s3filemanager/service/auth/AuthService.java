@@ -106,13 +106,13 @@ public class AuthService {
     private User verifyCredentials(String username, String password) {
         User user = userService.findByUsernameForAuth(username);
 
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new BadCredentialsException(SecurityErrorMessages.INVALID_CREDENTIALS);
+        }
+
         if (user.getStatus() == UserStatus.BLOCKED) {
             log.warn("Blocked user attempted login: {}", username);
             throw new UserBlockedException(username);
-        }
-
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new BadCredentialsException(SecurityErrorMessages.INVALID_CREDENTIALS);
         }
         return user;
     }

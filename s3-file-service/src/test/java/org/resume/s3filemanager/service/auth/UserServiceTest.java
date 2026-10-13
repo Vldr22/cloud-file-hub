@@ -90,21 +90,6 @@ class UserServiceTest {
     }
 
     /**
-     * Создание администратора — сохраняется с ролью ADMIN и статусом UNLIMITED.
-     */
-    @Test
-    void shouldCreateAdmin_whenUsernameIsUnique() {
-        when(userRepository.existsByUsername(username)).thenReturn(false);
-        when(passwordEncoder.encode(password)).thenReturn(FAKER.internet().password());
-
-        userService.createAdmin(username, password);
-
-        verify(userRepository).save(argThat(u ->
-                u.getRole() == UserRole.ADMIN &&
-                        u.getUploadStatus() == FileUploadStatus.UNLIMITED));
-    }
-
-    /**
      * Поиск по имени — возвращает пользователя.
      */
     @Test

@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.constant.ErrorMessages;
 import org.resume.s3filemanager.constant.ValidationMessages;
@@ -16,8 +17,10 @@ import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
-import org.resume.s3filemanager.properties.FileUploadProperties;
-import org.resume.s3filemanager.service.kafka.OutboxService;
+import org.resume.s3filemanager.service.file.strategy.DuplicateFileErrorStrategy;
+import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
+import org.resume.s3filemanager.service.file.strategy.FileReadErrorStrategy;
+import org.resume.s3filemanager.service.file.strategy.S3YandexErrorStrategy;
 import org.resume.s3filemanager.validation.FileValidator;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
@@ -53,11 +56,15 @@ class FileFacadeServiceTest {
     @Mock
     private FileValidator fileValidator;
 
-    @Mock
-    private FileUploadProperties fileUploadProperties;
+    @Spy
+    private ErrorResponseStrategyResolver errorResponseStrategyResolver =
+            new ErrorResponseStrategyResolver(List.of(
+                    new DuplicateFileErrorStrategy(),
+                    new FileReadErrorStrategy(),
+                    new S3YandexErrorStrategy()));
 
-    @Mock
-    private OutboxService outboxService;
+    @Spy
+    private S3KeyGenerator s3KeyGenerator = new S3KeyGenerator();
 
     @InjectMocks
     private FileFacadeService fileFacadeService;
@@ -90,14 +97,13 @@ class FileFacadeServiceTest {
 
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileHashService.calculateMD5(any())).thenReturn(fileHash);
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), eq(fileHash), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(user)))
                 .thenReturn(saved);
 
         fileFacadeService.uploadFile(validPdfFile);
 
         verify(fileStorageService).uploadFileYandexS3(anyString(), any(), eq("application/pdf"));
-        verify(fileMetadataService).saveFileWithPermission(any(), anyString(), eq(fileHash), eq(user));
-        verify(outboxService).saveFileUploadEvent(eq(saved), eq(user.getId()));
+        verify(fileMetadataService).saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(user));
     }
 
     /**
@@ -111,7 +117,7 @@ class FileFacadeServiceTest {
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile))
                 .isInstanceOf(FileUploadLimitException.class);
 
-        verifyNoInteractions(fileStorageService, fileMetadataService, outboxService);
+        verifyNoInteractions(fileStorageService, fileMetadataService);
     }
 
     /**
@@ -127,17 +133,17 @@ class FileFacadeServiceTest {
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile))
                 .isInstanceOf(DuplicateFileException.class);
 
-        verifyNoInteractions(fileStorageService, fileMetadataService, outboxService);
+        verifyNoInteractions(fileStorageService, fileMetadataService);
     }
 
     /**
-     * Ошибка сохранения в БД — файл откатывается из S3 (паттерн Saga).
+     * Ошибка сохранения в БД — файл откатывается из S3.
      */
     @Test
     void shouldRollbackS3Upload_whenDatabaseSaveFails() {
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), anyString(), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), eq(user)))
                 .thenThrow(new RuntimeException());
 
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile))
@@ -145,7 +151,6 @@ class FileFacadeServiceTest {
 
         verify(fileStorageService).uploadFileYandexS3(anyString(), any(), anyString());
         verify(fileStorageService).deleteFileYandexS3(anyString());
-        verifyNoInteractions(outboxService);
     }
 
     // multipleUpload
@@ -167,12 +172,11 @@ class FileFacadeServiceTest {
 
         FileMetadata saved = buildFileMetadata();
 
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(5);
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileValidator.validateFile(validPdfFile)).thenReturn(Optional.empty());
         when(fileValidator.validateFile(invalidFile)).thenReturn(Optional.of(validationError));
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), anyString(), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), eq(user)))
                 .thenReturn(saved);
 
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
@@ -204,7 +208,6 @@ class FileFacadeServiceTest {
                 "application/x-msdownload",
                 new byte[]{1});
 
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(5);
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileValidator.validateFile(any())).thenReturn(Optional.of(validationError));
 
@@ -220,43 +223,6 @@ class FileFacadeServiceTest {
     }
 
     /**
-     * Превышен лимит файлов — TooManyFilesException до начала обработки.
-     */
-    @Test
-    void shouldThrowTooManyFilesException_whenFileLimitExceeded() {
-        int limit = 5;
-        MultipartFile[] files = new MultipartFile[limit + 1];
-        for (int i = 0; i < files.length; i++) {
-            files[i] = new MockMultipartFile(
-                    "file",
-                    FAKER.file().fileName(
-                            null,
-                            null,
-                            "pdf",
-                            null),
-                    "application/pdf",
-                    new byte[]{1});
-        }
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(limit);
-
-        assertThatThrownBy(() -> fileFacadeService.multipleUpload(files))
-                .isInstanceOf(TooManyFilesException.class);
-
-        verifyNoInteractions(filePermissionService, fileStorageService, fileMetadataService);
-    }
-
-    /**
-     * Пустой массив файлов — IllegalArgumentException до начала обработки.
-     */
-    @Test
-    void shouldThrowIllegalArgumentException_whenFilesArrayIsEmpty() {
-        assertThatThrownBy(() -> fileFacadeService.multipleUpload(new MultipartFile[0]))
-                .isInstanceOf(IllegalArgumentException.class);
-
-        verifyNoInteractions(filePermissionService, fileStorageService);
-    }
-
-    /**
      * Дубликат в пакетной загрузке — дубликат получает ERROR, второй файл загружается успешно.
      */
     @Test
@@ -269,14 +235,13 @@ class FileFacadeServiceTest {
 
         FileMetadata saved = buildFileMetadata();
 
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(5);
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileValidator.validateFile(any())).thenReturn(Optional.empty());
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
         doThrow(new DuplicateFileException())
                 .doNothing()
                 .when(fileHashService).checkDuplicateInDatabase(anyString(), any());
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), anyString(), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), eq(user)))
                 .thenReturn(saved);
 
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
@@ -299,7 +264,6 @@ class FileFacadeServiceTest {
                 "application/pdf",
                 FAKER.lorem().characters(10).getBytes());
 
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(5);
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileValidator.validateFile(any())).thenReturn(Optional.empty());
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
@@ -307,7 +271,7 @@ class FileFacadeServiceTest {
         doThrow(new S3YandexException(new RuntimeException(), FAKER.internet().uuid()))
                 .doNothing()
                 .when(fileStorageService).uploadFileYandexS3(anyString(), any(), anyString());
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), anyString(), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), eq(user)))
                 .thenReturn(buildFileMetadata());
 
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
@@ -327,10 +291,9 @@ class FileFacadeServiceTest {
         when(unreadableFile.getOriginalFilename()).thenReturn("broken.pdf");
         when(unreadableFile.getBytes()).thenThrow(new java.io.IOException());
 
-        when(fileUploadProperties.getMaxBatchSize()).thenReturn(5);
         when(filePermissionService.checkUploadPermission()).thenReturn(user);
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
-        when(fileMetadataService.saveFileWithPermission(any(), anyString(), anyString(), eq(user)))
+        when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), eq(user)))
                 .thenReturn(buildFileMetadata());
 
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(

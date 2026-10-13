@@ -96,14 +96,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorizeRequests -> authorizeRequests
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers("/api/home").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/files/{uniqueName}").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/files/upload").authenticated()
                         .requestMatchers(HttpMethod.DELETE, "/api/files/{uniqueName}").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/files/multiple-upload").hasAuthority(UserRole.ADMIN.getAuthority())
-                        .requestMatchers(HttpMethod.GET, "/api/admin/audit-logs").hasAuthority(UserRole.ADMIN.getAuthority())
                         .requestMatchers("/api/admin/**").hasAuthority(UserRole.ADMIN.getAuthority())
-                        .requestMatchers("/api/auth/logout").authenticated()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();

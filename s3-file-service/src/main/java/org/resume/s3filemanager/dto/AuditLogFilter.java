@@ -7,7 +7,8 @@ import org.resume.s3filemanager.enums.CommonResponseStatus;
 import java.time.Instant;
 
 @Schema(description = "Фильтр для получения аудит-логов")
-public record AuditLogFilterRequest(
+public record AuditLogFilter(
+
         @Schema(description = "Имя пользователя", example = "Sara")
         String username,
 
@@ -22,4 +23,5 @@ public record AuditLogFilterRequest(
 
         @Schema(description = "Начало периода", example = "2026-03-11T03:41:17.639342344")
         Instant to) {
+
 }

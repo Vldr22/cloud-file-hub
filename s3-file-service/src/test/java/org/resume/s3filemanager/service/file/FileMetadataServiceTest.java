@@ -15,6 +15,7 @@ import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.exception.FileNotFoundException;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.service.auth.UserService;
+import org.resume.s3filemanager.service.kafka.OutboxService;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.util.Optional;
@@ -38,6 +39,9 @@ class FileMetadataServiceTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private OutboxService outboxService;
 
     @InjectMocks
     private FileMetadataService fileMetadataService;
@@ -88,17 +92,19 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Сохранение с привязкой — метаданные сохраняются и статус загрузки пользователя обновляется.
+     * Сохранение с outbox-событием — метаданные сохраняются, статус загрузки пользователя
+     * обновляется и создаётся событие на антивирусную проверку.
      */
     @Test
-    void shouldSaveAndMarkUploaded_whenSaveFileWithPermission() {
+    void shouldSaveMarkUploadedAndCreateOutboxEvent_whenSaveFileWithOutboxEvent() {
         when(fileMetadataRepository.save(any())).thenReturn(fileMetadata);
 
-        FileMetadata result = fileMetadataService.saveFileWithPermission(multipartFile, uniqueName, fileHash, user);
+        FileMetadata result = fileMetadataService.saveFileWithOutboxEvent(multipartFile, uniqueName, fileHash, user);
 
         assertThat(result).isEqualTo(fileMetadata);
         verify(fileMetadataRepository).save(any());
         verify(fileUploadPermissionService).markFileUploaded();
+        verify(outboxService).saveFileUploadEvent(fileMetadata, user.getId());
     }
 
     /**
