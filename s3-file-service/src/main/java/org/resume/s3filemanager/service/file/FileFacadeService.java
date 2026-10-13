@@ -2,6 +2,7 @@ package org.resume.s3filemanager.service.file;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.audit.AuditOperation;
 import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
@@ -106,11 +107,17 @@ public class FileFacadeService {
      * @param uniqueName the UUID-based unique filename
      * @return file download response with content and metadata
      * @throws FileNotFoundException if file metadata not found in database
+     * @throws FileNotAvailableException если файл не прошёл антивирусную проверку
      * @throws S3YandexException if S3 download fails
      */
     @Auditable(operation = AuditOperation.FILE_DOWNLOAD, resourceType = ResourceType.FILE)
     public FileDownloadResponse downloadFile(String uniqueName) {
         FileMetadata metadata = fileMetadataService.findByUniqueName(uniqueName);
+
+        if (metadata.getScanStatus() != ScanStatus.CLEAN) {
+            throw new FileNotAvailableException(metadata.getScanStatus());
+        }
+
         byte[] data = fileStorageService.downloadFileYandexS3(uniqueName);
 
         String encodedFileName = URLEncoder.encode(

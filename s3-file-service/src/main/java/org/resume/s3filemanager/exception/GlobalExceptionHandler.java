@@ -106,6 +106,12 @@ public class GlobalExceptionHandler {
         return createErrorResponse(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
+    @ExceptionHandler(FileNotAvailableException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public CommonResponse<Void> handleFileNotAvailable(FileNotAvailableException e) {
+        return createErrorResponse(HttpStatus.CONFLICT, e.getMessage());
+    }
+
     @ExceptionHandler(InvalidScanStatusException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public CommonResponse<Void> handleInvalidScanStatus(InvalidScanStatusException e) {

@@ -126,6 +126,7 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
         fileFacadeService.uploadFile(multipartFile);
 
         String uniqueName = fileMetadataRepository.findAll().getFirst().getUniqueName();
+        markAsClean(uniqueName);
         var response = fileFacadeService.downloadFile(uniqueName);
 
         assertThat(response.getContent()).isEqualTo(multipartFile.getBytes());
@@ -153,11 +154,21 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
         fileFacadeService.uploadFile(multipartFile);
 
         String uniqueName = fileMetadataRepository.findAll().getFirst().getUniqueName();
+        markAsClean(uniqueName);
 
         fileFacadeService.downloadFile(uniqueName);
         fileFacadeService.deleteFile(uniqueName);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
                 assertThat(auditLogRepository.count()).isEqualTo(3));
+    }
+
+    /**
+     * Имитирует успешную антивирусную проверку - в тестах antivirus-service не запущен.
+     */
+    private void markAsClean(String uniqueName) {
+        FileMetadata file = fileMetadataRepository.findByUniqueName(uniqueName).orElseThrow();
+        file.setScanStatus(ScanStatus.CLEAN);
+        fileMetadataRepository.save(file);
     }
 }
