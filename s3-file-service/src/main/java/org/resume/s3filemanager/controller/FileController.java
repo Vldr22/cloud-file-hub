@@ -79,6 +79,7 @@ public class FileController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Файл успешно скачан"),
             @ApiResponse(responseCode = "404", description = "Файл не найден"),
+            @ApiResponse(responseCode = "409", description = "Файл не прошёл антивирусную проверку"),
             @ApiResponse(responseCode = "500", description = "Ошибка S3")
     })
     @SecurityRequirements
