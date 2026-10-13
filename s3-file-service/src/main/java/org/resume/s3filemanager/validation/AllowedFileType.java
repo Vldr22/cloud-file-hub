@@ -57,6 +57,14 @@ public enum AllowedFileType {
     private final String extension;
 
     /**
+     * Проверяет, есть ли расширение (без точки) в списке разрешенных.
+     */
+    public static boolean isExtensionAllowed(String extension) {
+        return Arrays.stream(values())
+                .anyMatch(type -> type.extension.equalsIgnoreCase(extension));
+    }
+
+    /**
      * Проверяет, разрешен ли файл с указанным расширением и MIME-типом.
      * <p>
      * Оба параметра должны совпадать с одной из комбинаций в enum.
