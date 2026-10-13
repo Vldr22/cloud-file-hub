@@ -239,7 +239,7 @@ paths:
       operationId: upload
       requestBody:
         content:
-          application/json:
+          multipart/form-data:
             schema:
               required:
               - file
@@ -305,16 +305,20 @@ paths:
       summary: Множественная загрузка
       description: Загружает до 5 файлов. Только для администраторов
       operationId: multipleUpload
-      parameters:
-      - name: files
-        in: query
-        description: Файлы для загрузки (до 5)
-        required: true
-        schema:
-          type: array
-          items:
-            type: string
-            format: binary
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              required:
+              - files
+              type: object
+              properties:
+                files:
+                  type: array
+                  description: Файлы для загрузки (до 5)
+                  items:
+                    type: string
+                    format: binary
       responses:
         "409":
           description: Conflict
