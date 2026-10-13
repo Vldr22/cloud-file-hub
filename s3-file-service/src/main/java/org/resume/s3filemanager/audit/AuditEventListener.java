@@ -8,6 +8,7 @@ import org.resume.s3filemanager.repository.AuditLogRepository;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /**
  * Слушатель событий аудита.
@@ -29,7 +30,7 @@ public class AuditEventListener {
             AuditLog auditLog = AuditLog.builder()
                     .requestId(event.getRequestId())
                     .username(event.getUsername())
-                    .ipAddress(new Inet(event.getIpAddress()))
+                    .ipAddress(toInet(event.getIpAddress()))
                     .operation(event.getOperation())
                     .resourceType(event.getResourceType())
                     .resourceId(event.getResourceId())
@@ -46,6 +47,13 @@ public class AuditEventListener {
         } catch (Exception e) {
             log.error("Failed to save audit log", e);
         }
+    }
+
+    private Inet toInet(String ipAddress) {
+        if (!StringUtils.hasText(ipAddress)) {
+            return null;
+        }
+        return new Inet(ipAddress);
     }
 
 }
