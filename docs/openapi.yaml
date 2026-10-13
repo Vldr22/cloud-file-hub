@@ -823,7 +823,7 @@ paths:
         example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
       responses:
         "409":
-          description: Conflict
+          description: Файл не прошёл антивирусную проверку
           content:
             '*/*':
               schema:

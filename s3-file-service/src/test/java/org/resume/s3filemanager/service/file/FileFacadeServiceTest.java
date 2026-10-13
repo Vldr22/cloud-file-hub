@@ -9,6 +9,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.constant.ErrorMessages;
 import org.resume.s3filemanager.constant.ValidationMessages;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
@@ -315,6 +316,7 @@ class FileFacadeServiceTest {
         byte[] content = FAKER.lorem().characters(20).getBytes();
         String uniqueName = FAKER.internet().uuid() + ".pdf";
         FileMetadata metadata = buildFileMetadataWithName("example.pdf");
+        metadata.setScanStatus(ScanStatus.CLEAN);
 
         when(fileStorageService.downloadFileYandexS3(uniqueName)).thenReturn(content);
         when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
@@ -350,14 +352,31 @@ class FileFacadeServiceTest {
     @Test
     void shouldThrowFileNotFoundException_whenFileNotInS3() {
         String uniqueName = FAKER.internet().uuid() + ".pdf";
+        FileMetadata metadata = buildFileMetadataWithName("example.pdf");
+        metadata.setScanStatus(ScanStatus.CLEAN);
 
-        when(fileMetadataService.findByUniqueName(uniqueName))
-                .thenReturn(mock(FileMetadata.class));
+        when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
         when(fileStorageService.downloadFileYandexS3(uniqueName))
                 .thenThrow(new FileNotFoundException(uniqueName));
 
         assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
                 .isInstanceOf(FileNotFoundException.class);
+    }
+
+    /**
+     * Файл не прошёл антивирусную проверку - FileNotAvailableException, S3 не вызывается.
+     */
+    @Test
+    void shouldThrowFileNotAvailableException_whenFileIsNotClean() {
+        String uniqueName = FAKER.internet().uuid() + ".pdf";
+        FileMetadata metadata = buildFileMetadataWithName("example.pdf");
+
+        when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
+
+        assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
+                .isInstanceOf(FileNotAvailableException.class);
+
+        verifyNoInteractions(fileStorageService);
     }
 
     // deleteFile
