@@ -73,7 +73,7 @@ services:
       - cloudfilehub-net
 
   clamav:
-    image: clamav/clamav:latest
+    image: clamav/clamav:1.5.2
     container_name: cloudfilehub-clamav-dev
     restart: unless-stopped
     entrypoint: /bin/sh
@@ -101,7 +101,7 @@ services:
       - ./clamav/freshclam.conf.custom:/etc/clamav/freshclam.conf:ro
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: provectuslabs/kafka-ui:v0.7.2
     container_name: cloudfilehub-kafka-ui-dev
     ports:
       - "8090:8080"

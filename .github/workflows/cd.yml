@@ -71,7 +71,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 5m
+          command_timeout: 15m
           envs: POSTGRES_DB,POSTGRES_USER,POSTGRES_PASSWORD,REDIS_PASSWORD,ACCESS_KEY,SECRET_KEY,JWT_SECRET_KEY,ADMIN_NAME,ADMIN_PASSWORD,CORS_ALLOWED_ORIGINS,GHCR_PAT
           script: |
             set -e
@@ -80,9 +80,14 @@ jobs:
             # Получаем актуальные конфиги из репозитория
             git pull origin main
 
-            # Запоминаем текущие образы на случай отката
-            S3_PREV=$(docker inspect --format='{{index .RepoDigests 0}}' s3-file-service 2>/dev/null || echo "")
-            AV_PREV=$(docker inspect --format='{{index .RepoDigests 0}}' antivirus-service 2>/dev/null || echo "")
+            # Помечаем запущенные образы тегом previous для отката - prune их не удалит
+            IMAGE_PREFIX=ghcr.io/vldr22/cloudfilehub
+            SERVICES="s3-file-service antivirus-service"
+            for SERVICE in $SERVICES; do
+              if docker inspect --type container "$SERVICE" > /dev/null 2>&1; then
+                docker tag "$(docker inspect --type container --format='{{.Image}}' "$SERVICE")" "$IMAGE_PREFIX/$SERVICE:previous"
+              fi
+            done
 
             # Обновляем .env — значения берутся из env переменных, не из логов
             printf 'POSTGRES_DB=%s\n'          "$POSTGRES_DB"          > .env
@@ -104,13 +109,12 @@ jobs:
             docker-compose pull s3-file-service antivirus-service
             docker-compose up -d --remove-orphans
             
-            # Сохраняем дайджесты для отката и чистим старые образы
-            echo "$S3_PREV" > /tmp/s3_prev_digest
-            echo "$AV_PREV" > /tmp/av_prev_digest
+            # Чистим неиспользуемые образы
             docker image prune -f
 
       # Проверяем что сервис поднялся — до 30 попыток каждые 15 секунд
       - name: Health check
+        id: health_check
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -138,7 +142,7 @@ jobs:
 
       # Откат на предыдущие образы если health check упал
       - name: Rollback on failure
-        if: failure()
+        if: failure() && steps.health_check.outcome == 'failure'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -149,19 +153,20 @@ jobs:
             set -e
             cd /opt/cloudfilehub
 
-            S3_PREV=$(cat /tmp/s3_prev_digest 2>/dev/null || echo "")
-            AV_PREV=$(cat /tmp/av_prev_digest 2>/dev/null || echo "")
+            IMAGE_PREFIX=ghcr.io/vldr22/cloudfilehub
+            SERVICES="s3-file-service antivirus-service"
 
-            if [ -z "$S3_PREV" ] || [ -z "$AV_PREV" ]; then
-              echo "No previous images found, skipping rollback"
-              exit 0
-            fi
+            for SERVICE in $SERVICES; do
+              if ! docker image inspect "$IMAGE_PREFIX/$SERVICE:previous" > /dev/null 2>&1; then
+                echo "No previous image for $SERVICE, skipping rollback"
+                exit 0
+              fi
+            done
 
             echo "Rolling back to previous images..."
-            docker-compose stop s3-file-service antivirus-service
-
-            docker tag "$S3_PREV" ghcr.io/vldr22/cloudfilehub/s3-file-service:latest
-            docker tag "$AV_PREV" ghcr.io/vldr22/cloudfilehub/antivirus-service:latest
+            for SERVICE in $SERVICES; do
+              docker tag "$IMAGE_PREFIX/$SERVICE:previous" "$IMAGE_PREFIX/$SERVICE:latest"
+            done
 
             docker-compose up -d s3-file-service antivirus-service
             echo "Rollback complete"
