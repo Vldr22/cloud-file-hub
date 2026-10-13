@@ -161,12 +161,11 @@ public class AdminController {
 
     @Operation(summary = "Удалить файлы по статусу", description = "Для INFECTED — только метаданные (S3 уже очищен). Для остальных — удаляет и из S3, и метаданные")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Файлы удалены"),
+            @ApiResponse(responseCode = "200", description = "Файлы удалены, в ответе количество удалённых записей"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Недостаточно прав")
     })
     @DeleteMapping("/files/scan-status")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
     public CommonResponse<Integer> deleteFilesByScanStatus(
             @Parameter(description = "Статус сканирования", example = "INFECTED") @RequestParam ScanStatus scanStatus) {
         return CommonResponse.success(adminFileService.deleteAllByScanStatus(scanStatus));
