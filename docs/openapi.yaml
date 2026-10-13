@@ -1193,8 +1193,8 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
-        "204":
-          description: Файлы удалены
+        "200":
+          description: "Файлы удалены, в ответе количество удалённых записей"
           content:
             '*/*':
               schema:

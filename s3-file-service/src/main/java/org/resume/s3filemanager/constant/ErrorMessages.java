@@ -31,6 +31,10 @@ public class ErrorMessages {
     // HTTP
     public static final String MISSING_PARAMETER = "Required parameter '%s' is missing";
     public static final String INVALID_PARAMETER_TYPE = "Parameter '%s' must be of type %s";
+    public static final String MALFORMED_REQUEST_BODY = "Malformed request body";
+    public static final String RESOURCE_NOT_FOUND = "Resource not found";
+    public static final String METHOD_NOT_SUPPORTED = "HTTP method '%s' is not supported for this endpoint";
+    public static final String MEDIA_TYPE_NOT_SUPPORTED = "Content type '%s' is not supported";
 
     // General
     public static final String INSUFFICIENT_PERMISSIONS = "Insufficient permissions";

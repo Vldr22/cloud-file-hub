@@ -98,12 +98,13 @@ class AuthServiceTest {
     }
 
     /**
-     * Пользователь заблокирован — UserBlockedException до проверки пароля.
+     * Пользователь заблокирован - UserBlockedException после проверки пароля.
      */
     @Test
     void shouldThrowUserBlockedException_whenUserIsBlocked() {
         user.setStatus(UserStatus.BLOCKED);
         when(userService.findByUsernameForAuth(authRequest.username())).thenReturn(user);
+        when(passwordEncoder.matches(authRequest.password(), user.getPassword())).thenReturn(true);
 
         assertThatThrownBy(() -> authService.login(authRequest, httpServletResponse))
                 .isInstanceOf(UserBlockedException.class);
