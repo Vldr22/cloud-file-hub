@@ -109,19 +109,21 @@ class FileValidatorTest {
     }
 
     /**
-     * Файл без Content-Type — браузер не передал MIME-тип
+     * Клиент прислал общий Content-Type (как Swagger UI) - тип определяется по содержимому, файл принимается.
      */
     @Test
-    void shouldReturnTypeUnknown_whenContentTypeIsAbsent() {
+    void shouldReturnEmpty_whenClientContentTypeIsGeneric() {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "document.pdf",
-                null, new byte[]
-                {1, 2, 3});
+                "application/octet-stream",
+                new byte[]{1, 2, 3});
+
+        when(tikaFileDetector.detectContentType(any(), eq("document.pdf"))).thenReturn("application/pdf");
 
         Optional<String> result = fileValidator.validateFile(file);
 
-        assertThat(result).contains(ValidationMessages.FILE_TYPE_UNKNOWN);
+        assertThat(result).isEmpty();
     }
 
     // validateFile — недопустимый тип
@@ -167,35 +169,33 @@ class FileValidatorTest {
      * Защита от обхода фильтра через переименование
      */
     @Test
-    void shouldReturnSignatureMismatch_whenFileIsRenamedToWrongExtension() {
+    void shouldReturnTypeNotAllowed_whenFileIsRenamedToWrongExtension() {
         MockMultipartFile file = validPdfFile;
 
-        when(tikaFileDetector.verifyContentType(any(), eq("document.pdf"), eq("application/pdf")))
-                .thenReturn(false);
+        when(tikaFileDetector.detectContentType(any(), eq("document.pdf"))).thenReturn("image/png");
 
         Optional<String> result = fileValidator.validateFile(file);
 
-        assertThat(result).contains(String.format(ValidationMessages.FILE_SIGNATURE_MISMATCH, "pdf"));
+        assertThat(result).contains(String.format(ValidationMessages.FILE_TYPE_NOT_ALLOWED, "pdf", "image/png"));
     }
 
 
     // validateFile — успешная валидация
 
     /**
-     * Валидный PDF — расширение, MIME-тип и сигнатура совпадают, ошибок нет
+     * Валидный PDF — расширение и тип по содержимому совпадают, ошибок нет
      */
     @Test
     void shouldReturnEmpty_whenFilePassesAllChecks() {
         MockMultipartFile file = validPdfFile;
 
-        when(tikaFileDetector.verifyContentType(any(), eq("document.pdf"), eq("application/pdf")))
-                .thenReturn(true);
+        when(tikaFileDetector.detectContentType(any(), eq("document.pdf"))).thenReturn("application/pdf");
 
         Optional<String> result = fileValidator.validateFile(file);
 
         assertThat(result).isEmpty();
 
-        verify(tikaFileDetector).verifyContentType(any(), eq("document.pdf"), eq("application/pdf"));
+        verify(tikaFileDetector).detectContentType(any(), eq("document.pdf"));
     }
 
     // validateFile — обработка исключений
@@ -210,7 +210,6 @@ class FileValidatorTest {
 
         when(file.isEmpty()).thenReturn(false);
         when(file.getOriginalFilename()).thenReturn("document.pdf");
-        when(file.getContentType()).thenReturn("application/pdf");
         when(file.getBytes()).thenThrow(new IOException());
 
         Optional<String> result = fileValidator.validateFile(file);
@@ -226,7 +225,7 @@ class FileValidatorTest {
     void shouldReturnProcessingError_whenTikaThrowsUnexpectedException() {
         MockMultipartFile file = validPdfFile;
 
-        when(tikaFileDetector.verifyContentType(any(), any(), any()))
+        when(tikaFileDetector.detectContentType(any(), any()))
                 .thenThrow(new RuntimeException());
 
         Optional<String> result = fileValidator.validateFile(file);
@@ -260,8 +259,7 @@ class FileValidatorTest {
     void shouldReturnTrue_andNotTouchContext_whenFileIsValid() {
         MockMultipartFile file = validPdfFile;
 
-        when(tikaFileDetector.verifyContentType(any(), eq("document.pdf"), eq("application/pdf")))
-                .thenReturn(true);
+        when(tikaFileDetector.detectContentType(any(), eq("document.pdf"))).thenReturn("application/pdf");
 
         boolean result = fileValidator.isValid(file, constraintValidatorContext);
 

@@ -17,10 +17,10 @@ import java.util.Optional;
  * <p>
  * Выполняет валидацию на основе:
  * <ul>
- *   <li>Расширения и MIME-типа файла (первый уровень)</li>
- *   <li>Реальной сигнатуры файла через Apache Tika (второй уровень)</li>
+ *   <li>Расширения файла по whitelist (первый уровень)</li>
+ *   <li>Типа, определённого Apache Tika по содержимому, для этого расширения (второй уровень)</li>
  * </ul>
- * Защищает от подмены типа файла путем переименования.
+ * Заявленный клиентом Content-Type не учитывается. Защищает от подмены типа файла путем переименования.
  *
  * @see ValidFile
  * @see TikaFileDetector
@@ -53,8 +53,8 @@ public class FileValidator implements ConstraintValidator<ValidFile, MultipartFi
      * <ul>
      *   <li>Наличие файла и наличие в нем содержания</li>
      *   <li>Корректность имени файла и расширения</li>
-     *   <li>Тип файла является разрешенным</li>
-     *   <li>Соответствие реальной сигнатуры заявленному типу</li>
+     *   <li>Расширение файла является разрешенным</li>
+     *   <li>Тип по содержимому соответствует расширению</li>
      * </ul>
      *
      * @param file файл для валидации
@@ -76,24 +76,17 @@ public class FileValidator implements ConstraintValidator<ValidFile, MultipartFi
         }
         extension = extension.toLowerCase();
 
-        String contentType = file.getContentType();
-        if (contentType == null || contentType.isBlank()) {
-            return Optional.of(ValidationMessages.FILE_TYPE_UNKNOWN);
-        }
-
-        if (!AllowedFileType.isAllowed(extension, contentType)) {
-            return Optional.of(
-                    String.format(ValidationMessages.FILE_TYPE_NOT_ALLOWED, extension, contentType)
-            );
+        if (!AllowedFileType.isExtensionAllowed(extension)) {
+            return Optional.of(String.format(ValidationMessages.FILE_EXTENSION_NOT_ALLOWED, extension));
         }
 
         try {
             byte[] fileBytes = file.getBytes();
-            boolean isValid = tikaFileDetector.verifyContentType(fileBytes, filename, contentType);
+            String detectedType = tikaFileDetector.detectContentType(fileBytes, filename);
 
-            if (!isValid) {
+            if (!AllowedFileType.isAllowed(extension, detectedType)) {
                 return Optional.of(
-                        String.format(ValidationMessages.FILE_SIGNATURE_MISMATCH, extension)
+                        String.format(ValidationMessages.FILE_TYPE_NOT_ALLOWED, extension, detectedType)
                 );
             }
 

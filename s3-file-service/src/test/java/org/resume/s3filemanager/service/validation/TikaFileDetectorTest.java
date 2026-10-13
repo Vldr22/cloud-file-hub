@@ -15,9 +15,6 @@ class TikaFileDetectorTest {
     private static final byte[] PDF_MAGIC_BYTES = {0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E};
     private static final byte[] PNG_MAGIC_BYTES = {(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
 
-    private static final String PDF_FILENAME = "document.pdf";
-    private static final String PDF_CONTENT_TYPE = "application/pdf";
-
     private TikaFileDetector tikaFileDetector;
 
     @BeforeEach
@@ -47,35 +44,13 @@ class TikaFileDetectorTest {
         assertThat(detected).isEqualTo("image/png");
     }
 
-    // verifyContentType
-
     /**
-     * Сигнатура файла совпадает с заявленным типом — файл валиден.
+     * PNG байты в файле с расширением .pdf - Tika определяет реальный тип по сигнатуре, а не по имени.
      */
     @Test
-    void shouldReturnTrue_whenSignatureMatchesDeclaredType() {
-        boolean result = tikaFileDetector.verifyContentType(PDF_MAGIC_BYTES, PDF_FILENAME, PDF_CONTENT_TYPE);
+    void shouldDetectPng_whenPngBytesHavePdfExtension() {
+        String detected = tikaFileDetector.detectContentType(PNG_MAGIC_BYTES, "document.pdf");
 
-        assertThat(result).isTrue();
-    }
-
-    /**
-     * PNG байты объявлены как PDF — классический случай переименования. Tika видит реальную сигнатуру и возвращает false.
-     */
-    @Test
-    void shouldReturnFalse_whenPngBytesAreDeclaredAsPdf() {
-        boolean result = tikaFileDetector.verifyContentType(PNG_MAGIC_BYTES, PDF_FILENAME, PDF_CONTENT_TYPE);
-
-        assertThat(result).isFalse();
-    }
-
-    /**
-     * Сравнение типов нечувствительно к регистру — "application/PDF" принимается как "application/pdf".
-     */
-    @Test
-    void shouldReturnTrue_whenContentTypeIsUpperCase() {
-        boolean result = tikaFileDetector.verifyContentType(PDF_MAGIC_BYTES, PDF_FILENAME, "application/PDF");
-
-        assertThat(result).isTrue();
+        assertThat(detected).isEqualTo("image/png");
     }
 }
