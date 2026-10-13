@@ -11,9 +11,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.util.Objects;
@@ -179,6 +183,40 @@ public class GlobalExceptionHandler {
         return createErrorResponse(
                 HttpStatus.BAD_REQUEST,
                 String.format(ErrorMessages.INVALID_PARAMETER_TYPE, e.getName(), requiredType)
+        );
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public CommonResponse<Void> handleMessageNotReadable(HttpMessageNotReadableException e) {
+        log.warn("Malformed request body: {}", e.getMessage());
+        return createErrorResponse(HttpStatus.BAD_REQUEST, ErrorMessages.MALFORMED_REQUEST_BODY);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public CommonResponse<Void> handleNoResourceFound(NoResourceFoundException e) {
+        log.warn("Resource not found: {}", e.getResourcePath());
+        return createErrorResponse(HttpStatus.NOT_FOUND, ErrorMessages.RESOURCE_NOT_FOUND);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    @ResponseStatus(HttpStatus.METHOD_NOT_ALLOWED)
+    public CommonResponse<Void> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        log.warn("Method not supported: {}", e.getMethod());
+        return createErrorResponse(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                String.format(ErrorMessages.METHOD_NOT_SUPPORTED, e.getMethod())
+        );
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    @ResponseStatus(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+    public CommonResponse<Void> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        log.warn("Media type not supported: {}", e.getContentType());
+        return createErrorResponse(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                String.format(ErrorMessages.MEDIA_TYPE_NOT_SUPPORTED, e.getContentType())
         );
     }
 
