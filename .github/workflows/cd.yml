@@ -108,7 +108,10 @@ jobs:
             # Deploy
             docker-compose pull s3-file-service antivirus-service
             docker-compose up -d --remove-orphans
-            
+
+            # Compose не пересоздаёт nginx при изменении nginx.conf - перезапуск подхватывает новый конфиг
+            docker-compose restart nginx
+
             # Чистим неиспользуемые образы
             docker image prune -f
 
