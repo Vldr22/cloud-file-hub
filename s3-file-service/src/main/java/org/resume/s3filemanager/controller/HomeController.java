@@ -8,9 +8,10 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.resume.s3filemanager.constant.ApiPaths;
+import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileResponse;
+import org.resume.s3filemanager.dto.PageResponse;
 import org.resume.s3filemanager.service.file.FilePaginationService;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,7 +42,7 @@ public class HomeController {
     @Parameter(name = "size", description = "Размер страницы", example = "20")
     @SecurityRequirements
     @GetMapping()
-    public Page<FileResponse> getFiles(@Parameter(hidden = true) Pageable pageable) {
-        return filePaginationService.paginate(pageable);
+    public CommonResponse<PageResponse<FileResponse>> getFiles(@Parameter(hidden = true) Pageable pageable) {
+        return CommonResponse.success(PageResponse.from(filePaginationService.paginate(pageable)));
     }
 }
