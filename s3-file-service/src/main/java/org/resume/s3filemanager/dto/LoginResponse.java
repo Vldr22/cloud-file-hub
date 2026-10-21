@@ -4,9 +4,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 @Schema(description = "Ответ при успешной аутентификации")
 public record LoginResponse(
-        @Schema(description = "JWT токен", example = "eyJhbGciOiJIUzI1NiJ9...")
-        String token,
-
         @Schema(description = "Имя пользователя", example = "Sara")
         String login,
 

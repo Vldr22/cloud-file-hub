@@ -51,7 +51,7 @@ public class AuthService {
      *
      * @param request запрос с именем пользователя и паролем
      * @param response HTTP ответ для установки cookie
-     * @return информация о входе с токеном, именем пользователя и ролью
+     * @return имя пользователя и роль
      * @throws UserNotFoundException если пользователь не найден
      * @throws UserBlockedException если пользователь заблокирован
      * @throws BadCredentialsException если учетные данные неверны
@@ -70,7 +70,7 @@ public class AuthService {
         jwtCookieService.setAuthCookie(response, token);
 
         log.info("User logged in successfully: {}", user.getUsername());
-        return new LoginResponse(token, user.getUsername(), user.getRole().getAuthority());
+        return new LoginResponse(user.getUsername(), user.getRole().getAuthority());
     }
 
     /**

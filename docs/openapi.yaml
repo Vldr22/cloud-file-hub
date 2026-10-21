@@ -1467,10 +1467,6 @@ components:
     LoginResponse:
       type: object
       properties:
-        token:
-          type: string
-          description: JWT токен
-          example: eyJhbGciOiJIUzI1NiJ9...
         login:
           type: string
           description: Имя пользователя

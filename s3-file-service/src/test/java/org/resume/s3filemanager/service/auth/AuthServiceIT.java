@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.resume.s3filemanager.BaseIntegrationTest;
 import org.resume.s3filemanager.dto.AuthRequest;
 import org.resume.s3filemanager.dto.LoginResponse;
@@ -111,14 +112,12 @@ class AuthServiceIT extends BaseIntegrationTest {
         AuthRequest request = new AuthRequest(username, password);
 
         LoginResponse loginResponse = authService.login(request, response);
+        String token = captureCookieToken(response);
 
         assertThat(loginResponse.login()).isEqualTo(username);
         assertThat(loginResponse.role()).isEqualTo(UserRole.USER.getAuthority());
-        assertThat(loginResponse.token()).isNotBlank();
-        assertThat(jwtWhitelistService.isValid(username, loginResponse.token())).isTrue();
-
-        verify(jwtCookieService).setAuthCookie(eq(response), eq(loginResponse.token()));
-
+        assertThat(token).isNotBlank();
+        assertThat(jwtWhitelistService.isValid(username, token)).isTrue();
     }
 
     /**
@@ -156,12 +155,13 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldLogout_andRemoveTokenFromRedis() {
         createActiveUser();
-        LoginResponse loginResponse = authService.login(new AuthRequest(username, password), response);
+        authService.login(new AuthRequest(username, password), response);
+        String token = captureCookieToken(response);
         setSecurityContext(username);
 
         authService.logout(response);
 
-        assertThat(jwtWhitelistService.isValid(username, loginResponse.token())).isFalse();
+        assertThat(jwtWhitelistService.isValid(username, token)).isFalse();
 
         verify(jwtCookieService).clearAuthCookie(response);
     }
@@ -174,18 +174,27 @@ class AuthServiceIT extends BaseIntegrationTest {
         createActiveUser();
         AuthRequest request = new AuthRequest(username, password);
 
-        LoginResponse first = authService.login(request, response);
+        authService.login(request, response);
+        String firstToken = captureCookieToken(response);
         setSecurityContext(username);
         authService.logout(response);
 
-        assertThat(jwtWhitelistService.isValid(username, first.token())).isFalse();
+        assertThat(jwtWhitelistService.isValid(username, firstToken)).isFalse();
 
-        LoginResponse second = authService.login(request, new MockHttpServletResponse());
+        HttpServletResponse secondResponse = new MockHttpServletResponse();
+        authService.login(request, secondResponse);
+        String secondToken = captureCookieToken(secondResponse);
 
-        assertThat(jwtWhitelistService.isValid(username, second.token())).isTrue();
+        assertThat(jwtWhitelistService.isValid(username, secondToken)).isTrue();
     }
 
     // HELPERS
+    private String captureCookieToken(HttpServletResponse response) {
+        ArgumentCaptor<String> tokenCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jwtCookieService).setAuthCookie(eq(response), tokenCaptor.capture());
+        return tokenCaptor.getValue();
+    }
+
     private void createActiveUser() {
         User user = new User();
         user.setUsername(username);

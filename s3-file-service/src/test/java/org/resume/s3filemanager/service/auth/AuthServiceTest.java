@@ -89,7 +89,6 @@ class AuthServiceTest {
 
         LoginResponse response = authService.login(authRequest, httpServletResponse);
 
-        assertThat(response.token()).isEqualTo(token);
         assertThat(response.login()).isEqualTo(user.getUsername());
         assertThat(response.role()).isEqualTo(UserRole.USER.getAuthority());
 
