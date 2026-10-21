@@ -5,11 +5,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.resume.common.model.FileScanResult;
 import org.resume.common.model.ScanStatus;
 import org.resume.common.properties.KafkaProperties;
+import org.resume.fileantivirusservice.constant.ErrorMessages;
+import org.resume.fileantivirusservice.exception.TechnicalException;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Producer для отправки результатов сканирования файлов в Kafka.
@@ -23,13 +29,15 @@ import java.time.Instant;
 @EnableConfigurationProperties(KafkaProperties.class)
 public class FileScanResultProducer {
 
+    private static final int SEND_TIMEOUT_SECONDS = 10;
+
     private final KafkaTemplate<String, FileScanResult> kafkaTemplate;
     private final KafkaProperties kafkaProperties;
 
     /**
      * Отправляет результат сканирования файла в Kafka.
      * <p>
-     * Использует асинхронную отправку с обработкой результата.
+     * Отправка синхронная: при ошибке бросает {@link TechnicalException}, чтобы сработал retry.
      *
      * @param scanResult результат сканирования файла
      */
@@ -39,16 +47,23 @@ public class FileScanResultProducer {
         log.info("Sending scan result to Kafka: s3Key={}, status={}",
                 scanResult.getS3Key(), scanResult.getStatus());
 
-        kafkaTemplate.send(topic, scanResult.getS3Key(), scanResult)
-                .whenComplete((result, e) -> {
-                    if (e != null) {
-                        log.error("Failed to send scan result: s3Key={}, status={}",
-                                scanResult.getS3Key(), scanResult.getStatus(), e);
-                    } else {
-                        log.debug("Scan result sent successfully: s3Key={}, offset={}",
-                                scanResult.getS3Key(), result.getRecordMetadata().offset());
-                    }
-                });
+        try {
+            SendResult<String, FileScanResult> result = kafkaTemplate
+                    .send(topic, scanResult.getS3Key(), scanResult)
+                    .get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+
+            log.debug("Scan result sent successfully: s3Key={}, offset={}",
+                    scanResult.getS3Key(), result.getRecordMetadata().offset());
+
+        } catch (ExecutionException | TimeoutException e) {
+            log.error("Failed to send scan result: s3Key={}, status={}",
+                    scanResult.getS3Key(), scanResult.getStatus(), e);
+            throw new TechnicalException(ErrorMessages.KAFKA_SEND_FAILED, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("Scan result send interrupted: s3Key={}", scanResult.getS3Key(), e);
+            throw new TechnicalException(ErrorMessages.KAFKA_SEND_FAILED, e);
+        }
     }
 
     /**
