@@ -9,6 +9,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.resume.s3filemanager.constant.SecurityConstants;
 import org.resume.s3filemanager.properties.SwaggerProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -31,13 +32,13 @@ public class OpenApiConfig {
 
     private final SwaggerProperties swaggerProperties;
 
-    private static final String SECURITY_SCHEME_NAME = "Bearer Authentication";
+    private static final String SECURITY_SCHEME_NAME = "Cookie Authentication";
     private static final String API_TITLE = "CloudFileHub API";
     private static final String API_VERSION = "1.0";
     private static final String CONTACT_NAME = "Vladimir — GitHub";
     private static final String CONTACT_URL = "https://github.com/Vldr22/cloud-file-hub";
     private static final String DESCRIPTION_PATH = "/swagger-description.md";
-    private static final String JWT_DESCRIPTION = "JWT токен, полученный через POST /api/v1/auth/login";
+    private static final String JWT_DESCRIPTION = "JWT в HttpOnly cookie, браузер ставит после POST /api/v1/auth/login";
 
     @Bean
     public OpenAPI customOpenAPI() {
@@ -52,10 +53,9 @@ public class OpenApiConfig {
                 .addSecurityItem(new SecurityRequirement().addList(SECURITY_SCHEME_NAME))
                 .components(new Components()
                         .addSecuritySchemes(SECURITY_SCHEME_NAME, new SecurityScheme()
-                                .name(SECURITY_SCHEME_NAME)
-                                .type(SecurityScheme.Type.HTTP)
-                                .scheme("bearer")
-                                .bearerFormat("JWT")
+                                .type(SecurityScheme.Type.APIKEY)
+                                .in(SecurityScheme.In.COOKIE)
+                                .name(SecurityConstants.COOKIE_NAME)
                                 .description(JWT_DESCRIPTION)))
                 .tags(List.of(
                         new Tag().name("Home").description("Публичный доступ к списку файлов без аутентификации"),
