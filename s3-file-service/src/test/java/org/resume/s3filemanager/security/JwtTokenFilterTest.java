@@ -1,6 +1,5 @@
 package org.resume.s3filemanager.security;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -9,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.constant.ApiPaths;
+import org.resume.s3filemanager.constant.SecurityErrorMessages;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -36,7 +36,7 @@ class JwtTokenFilterTest {
     private JwtCookieService jwtCookieService;
 
     @Mock
-    private ObjectMapper objectMapper;
+    private SecurityExceptionHandler securityExceptionHandler;
 
     @InjectMocks
     private JwtTokenFilter jwtTokenFilter;
@@ -47,7 +47,7 @@ class JwtTokenFilterTest {
     }
 
     /**
-     * Токен отсутствует в cookie — запрос пропускается дальше по цепочке.
+     * Без токена в cookie запрос идёт дальше по цепочке.
      */
     @Test
     void doFilterInternal_continuesChain_whenTokenIsNull() throws Exception {
@@ -60,11 +60,11 @@ class JwtTokenFilterTest {
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
         assertThat(chain.getRequest()).isNotNull();
-        verifyNoInteractions(jwtTokenService, jwtWhitelistService);
+        verifyNoInteractions(jwtTokenService, jwtWhitelistService, securityExceptionHandler);
     }
 
     /**
-     * Токен не прошёл проверку whitelist — возвращается 401.
+     * Токена нет в whitelist: 401.
      */
     @Test
     void doFilterInternal_returns401_whenTokenNotInWhitelist() throws Exception {
@@ -78,12 +78,12 @@ class JwtTokenFilterTest {
 
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        assertThat(response.getStatus()).isEqualTo(401);
+        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_INVALID);
         assertThat(chain.getRequest()).isNull();
     }
 
     /**
-     * Токен истёк — возвращается 401 с сообщением TOKEN_EXPIRED.
+     * Истёкший токен: 401 с TOKEN_EXPIRED.
      */
     @Test
     void doFilterInternal_returns401_whenTokenExpired() throws Exception {
@@ -96,13 +96,12 @@ class JwtTokenFilterTest {
 
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        assertThat(response.getStatus()).isEqualTo(401);
-        assertThat(response.getContentType()).contains("application/problem+json");
+        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_EXPIRED);
         assertThat(chain.getRequest()).isNull();
     }
 
     /**
-     * Токен невалиден (общее исключение) — возвращается 401.
+     * Невалидный токен: 401 с TOKEN_INVALID.
      */
     @Test
     void doFilterInternal_returns401_whenTokenInvalid() throws Exception {
@@ -115,12 +114,12 @@ class JwtTokenFilterTest {
 
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        assertThat(response.getStatus()).isEqualTo(401);
+        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_INVALID);
         assertThat(chain.getRequest()).isNull();
     }
 
     /**
-     * Токен валиден — аутентификация устанавливается в SecurityContext, запрос пропускается.
+     * Валидный токен: аутентификация в SecurityContext, запрос идёт дальше.
      */
     @Test
     void doFilterInternal_setsAuthentication_whenTokenValid() throws Exception {
@@ -141,7 +140,7 @@ class JwtTokenFilterTest {
     }
 
     /**
-     * Публичный путь — фильтр пропускает запрос без проверки токена.
+     * Публичный путь фильтр не проверяет.
      */
     @Test
     void shouldNotFilter_returnsTrue_forPublicPaths() {
@@ -151,7 +150,7 @@ class JwtTokenFilterTest {
     }
 
     /**
-     * Защищённый путь — фильтр применяется.
+     * Защищённый путь фильтр проверяет.
      */
     @Test
     void shouldNotFilter_returnsFalse_forProtectedPaths() {

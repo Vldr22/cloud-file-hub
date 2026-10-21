@@ -5,6 +5,7 @@ import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.properties.CorsProperties;
 import org.resume.s3filemanager.security.JwtTokenFilter;
+import org.resume.s3filemanager.security.SecurityExceptionHandler;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,18 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 /**
- * Конфигурация Spring Security для защиты REST API.
- * <p>
- * Настраивает:
- * <ul>
- *   <li>JWT аутентификацию через cookie</li>
- *   <li>Stateless session management</li>
- *   <li>CORS политику из конфигурации</li>
- *   <li>Авторизацию на уровне endpoint'ов по ролям</li>
- * </ul>
- * Публичные endpoints: /api/v1/auth/login, /api/v1/auth/register, /api/v1/home
- *
- * @see JwtTokenFilter
+ * Конфигурация Spring Security: stateless JWT в cookie, CORS и доступ по ролям.
  */
 @Configuration
 @EnableWebSecurity
@@ -44,6 +34,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtTokenFilter jwtTokenFilter;
+    private final SecurityExceptionHandler securityExceptionHandler;
     private final CorsProperties corsProperties;
 
     @Bean
@@ -69,25 +60,6 @@ public class SecurityConfig {
         return source;
     }
 
-    /**
-     * Настраивает цепочку фильтров безопасности.
-     * <p>
-     * Публичные пути:
-     * <ul>
-     *   <li>/api/v1/auth/* - регистрация и вход</li>
-     *   <li>/api/v1/home - список файлов без аутентификации</li>
-     * </ul>
-     * Защищенные пути:
-     * <ul>
-     *   <li>/api/v1/files/* - требуют аутентификации</li>
-     *   <li>/api/v1/files/multiple-upload - только ADMIN</li>
-     *   <li>/api/v1/admin/* - только ADMIN</li>
-     * </ul>
-     *
-     * @param http конфигуратор HTTP безопасности
-     * @return настроенная цепочка фильтров
-     * @throws Exception при ошибке конфигурации
-     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
@@ -104,6 +76,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, ApiPaths.FILES + "/multiple-upload").hasAuthority(UserRole.ADMIN.getAuthority())
                         .requestMatchers(ApiPaths.ADMIN + "/**").hasAuthority(UserRole.ADMIN.getAuthority())
                         .anyRequest().authenticated())
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(securityExceptionHandler)
+                        .accessDeniedHandler(securityExceptionHandler))
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
