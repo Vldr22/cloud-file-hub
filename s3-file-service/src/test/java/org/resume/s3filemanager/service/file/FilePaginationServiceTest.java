@@ -6,10 +6,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.dto.FileResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
+import org.resume.s3filemanager.mapper.FileMapper;
+import org.resume.s3filemanager.mapper.FileMapperImpl;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -35,11 +38,14 @@ class FilePaginationServiceTest {
     @Mock
     private FileMetadataRepository fileMetadataRepository;
 
+    @Spy
+    private FileMapper fileMapper = new FileMapperImpl();
+
     @InjectMocks
     private FilePaginationService filePaginationService;
 
     /**
-     * Страница с файлами — DTO содержит правильные поля и размер в МБ.
+     * Страница с файлами: DTO содержит правильные поля и размер в МБ.
      */
     @Test
     void shouldReturnPageWithCorrectDto_whenFilesExist() {
@@ -65,7 +71,7 @@ class FilePaginationServiceTest {
     }
 
     /**
-     * Пустая страница — возвращаем пустой Page без ошибок.
+     * Пустая страница: возвращаем пустой Page без ошибок.
      */
     @Test
     void shouldReturnEmptyPage_whenNoFilesExist() {
@@ -79,12 +85,12 @@ class FilePaginationServiceTest {
     }
 
     /**
-     * Конвертация байт в МБ — дробное значение округляется до двух знаков.
+     * Конвертация байт в МБ: дробное значение округляется до двух знаков.
      */
     @Test
     void shouldFormatSizeCorrectly_whenConvertingBytesToMb() {
-        assertThat(FilePaginationService.convertToMB(ONE_MB)).isEqualTo("1.00 MB");
-        assertThat(FilePaginationService.convertToMB(ONE_AND_HALF_MB)).isEqualTo("1.50 MB");
-        assertThat(FilePaginationService.convertToMB(ONE_HUNDRED_KB)).isEqualTo("0.10 MB");
+        assertThat(fileMapper.toMegabytes(ONE_MB)).isEqualTo("1.00 MB");
+        assertThat(fileMapper.toMegabytes(ONE_AND_HALF_MB)).isEqualTo("1.50 MB");
+        assertThat(fileMapper.toMegabytes(ONE_HUNDRED_KB)).isEqualTo("0.10 MB");
     }
 }

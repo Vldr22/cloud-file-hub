@@ -19,6 +19,7 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserBlockedException;
 import org.resume.s3filemanager.mapper.UserMapper;
+import org.resume.s3filemanager.mapper.UserMapperImpl;
 import org.resume.s3filemanager.security.JwtCookieService;
 import org.resume.s3filemanager.security.JwtTokenService;
 import org.resume.s3filemanager.security.JwtWhitelistService;
@@ -56,7 +57,7 @@ class AuthServiceTest {
     private HttpServletResponse httpServletResponse;
 
     @Spy
-    private UserMapper userMapper;
+    private UserMapper userMapper = new UserMapperImpl();
 
     @InjectMocks
     private AuthService authService;

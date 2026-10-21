@@ -4,8 +4,8 @@ import com.querydsl.core.BooleanBuilder;
 import lombok.RequiredArgsConstructor;
 import org.resume.s3filemanager.dto.AuditLogFilter;
 import org.resume.s3filemanager.dto.AuditLogResponse;
-import org.resume.s3filemanager.entity.AuditLog;
 import org.resume.s3filemanager.entity.QAuditLog;
+import org.resume.s3filemanager.mapper.AuditLogMapper;
 import org.resume.s3filemanager.repository.AuditLogRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 public class AdminAuditService {
 
     private final AuditLogRepository auditLogRepository;
+    private final AuditLogMapper auditLogMapper;
 
     /**
      * Возвращает отфильтрованный список записей аудита.
@@ -31,7 +32,7 @@ public class AdminAuditService {
         BooleanBuilder builder = buildFilter(filter);
 
         return auditLogRepository.findAll(builder, pageable)
-                .map(this::toAuditLogResponse);
+                .map(auditLogMapper::toAuditLogResponse);
     }
 
     private BooleanBuilder buildFilter(AuditLogFilter filter) {
@@ -55,20 +56,5 @@ public class AdminAuditService {
         }
 
         return builder;
-    }
-
-    private AuditLogResponse toAuditLogResponse(AuditLog entity) {
-        return new AuditLogResponse(
-                entity.getId(),
-                entity.getRequestId(),
-                entity.getUsername(),
-                entity.getIpAddress() != null ? entity.getIpAddress().getAddress() : null,
-                entity.getOperation(),
-                entity.getResourceType(),
-                entity.getResourceId(),
-                entity.getStatus(),
-                entity.getDetails(),
-                entity.getTimestamp()
-        );
     }
 }

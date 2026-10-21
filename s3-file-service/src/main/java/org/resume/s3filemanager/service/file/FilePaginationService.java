@@ -3,25 +3,21 @@ package org.resume.s3filemanager.service.file;
 import lombok.RequiredArgsConstructor;
 import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.dto.FileResponse;
-import org.resume.s3filemanager.entity.FileMetadata;
+import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.Locale;
-
 /**
- * Сервис для постраничного получения списка файлов.
- * <p>
- * Преобразует метаданные файлов в DTO с форматированным размером файла в мегабайтах.
+ * Сервис для постраничного получения списка проверенных файлов.
  */
 @Service
 @RequiredArgsConstructor
 public class FilePaginationService {
 
     private final FileMetadataRepository fileMetadataRepository;
-    private final static String MB_SUFFIX = " MB";
+    private final FileMapper fileMapper;
 
     /**
      * Возвращает постраничный список файлов с метаданными.
@@ -30,17 +26,7 @@ public class FilePaginationService {
      * @return страница с информацией о файлах
      */
     public Page<FileResponse> paginate(Pageable pageable) {
-        Page<FileMetadata> fileMetadataPage = fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable);
-        return fileMetadataPage.map(
-                file -> FileResponse.builder()
-                        .fileName(file.getOriginalName())
-                        .uniqueName(file.getUniqueName())
-                        .fileSize(convertToMB(file.getSize()))
-                        .build());
-    }
-
-    public static String convertToMB(long bytes) {
-        double mb = bytes / 1_048_576.0;
-        return String.format(Locale.US, "%.2f", mb) + MB_SUFFIX;
+        return fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable)
+                .map(fileMapper::toFileResponse);
     }
 }
