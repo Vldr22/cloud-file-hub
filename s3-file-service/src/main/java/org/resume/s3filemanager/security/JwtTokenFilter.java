@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.MdcConstants;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
+import org.resume.s3filemanager.enums.UserRole;
 import org.slf4j.MDC;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -72,12 +73,12 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 return;
             }
 
-            String role = jwtTokenService.extractRole(token);
+            UserRole role = UserRole.fromAuthority(jwtTokenService.extractRole(token));
 
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    username,
+                    new AuthenticatedUser(username, role),
                     null,
-                    Collections.singletonList(new SimpleGrantedAuthority(role))
+                    Collections.singletonList(new SimpleGrantedAuthority(role.getAuthority()))
             );
 
             SecurityContextHolder.getContext().setAuthentication(authentication);

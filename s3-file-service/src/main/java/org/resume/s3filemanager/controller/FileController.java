@@ -12,6 +12,7 @@ import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.FileFacadeService;
 import org.resume.s3filemanager.validation.ValidBatchSize;
 import org.resume.s3filemanager.validation.ValidFile;
@@ -19,6 +20,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,8 +58,9 @@ public class FileController {
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<String> upload (
             @Parameter(description = "Файл для загрузки", required = true)
-            @RequestParam("file") @ValidFile MultipartFile file) {
-        fileFacadeService.uploadFile(file);
+            @RequestParam("file") @ValidFile MultipartFile file,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        fileFacadeService.uploadFile(file, authenticatedUser);
         return CommonResponse.success(SuccessMessages.FILE_UPLOAD_SUCCESS);
     }
 
@@ -73,8 +76,9 @@ public class FileController {
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<List<MultipleUploadResponse>> multipleUpload(
             @Parameter(description = "Файлы для загрузки (до ${app.multiple-upload.max-batch-size})", required = true)
-            @RequestParam("files") @ValidBatchSize MultipartFile[] files) {
-        List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(files);
+            @RequestParam("files") @ValidBatchSize MultipartFile[] files,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(files, authenticatedUser);
         return CommonResponse.success(results);
     }
 
@@ -111,7 +115,8 @@ public class FileController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
             @Parameter(description = "Уникальное имя файла", example = "212d7ce9-8451-4c4d-881e-d198593aa518.png")
-            @PathVariable String uniqueName) {
-        fileFacadeService.deleteFile(uniqueName);
+            @PathVariable String uniqueName,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        fileFacadeService.deleteFile(uniqueName, authenticatedUser);
     }
 }

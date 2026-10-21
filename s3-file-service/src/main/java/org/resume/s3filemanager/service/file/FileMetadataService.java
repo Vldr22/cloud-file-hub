@@ -76,7 +76,7 @@ public class FileMetadataService {
     @Transactional
     public FileMetadata saveFileWithOutboxEvent(MultipartFile file, String uniqueFileName, String fileHash, User user) {
         FileMetadata saved = saveDatabaseMetadata(file, uniqueFileName, fileHash, user);
-        fileUploadPermissionService.markFileUploaded();
+        fileUploadPermissionService.markFileUploaded(user.getId());
         outboxService.saveFileUploadEvent(saved, user.getId());
         return saved;
     }

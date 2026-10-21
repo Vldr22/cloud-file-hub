@@ -16,18 +16,14 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserBlockedException;
 import org.resume.s3filemanager.repository.UserRepository;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.security.JwtCookieService;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -65,7 +61,6 @@ class AuthServiceIT extends BaseIntegrationTest {
         response = new MockHttpServletResponse();
 
         userRepository.deleteAll();
-        SecurityContextHolder.clearContext();
     }
 
     // REGISTER
@@ -157,9 +152,8 @@ class AuthServiceIT extends BaseIntegrationTest {
         createActiveUser();
         authService.login(new AuthRequest(username, password), response);
         String token = captureCookieToken(response);
-        setSecurityContext(username);
 
-        authService.logout(response);
+        authService.logout(new AuthenticatedUser(username, UserRole.USER), response);
 
         assertThat(jwtWhitelistService.isValid(username, token)).isFalse();
 
@@ -176,8 +170,7 @@ class AuthServiceIT extends BaseIntegrationTest {
 
         authService.login(request, response);
         String firstToken = captureCookieToken(response);
-        setSecurityContext(username);
-        authService.logout(response);
+        authService.logout(new AuthenticatedUser(username, UserRole.USER), response);
 
         assertThat(jwtWhitelistService.isValid(username, firstToken)).isFalse();
 
@@ -213,13 +206,5 @@ class AuthServiceIT extends BaseIntegrationTest {
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
         user.setStatus(UserStatus.BLOCKED);
         userRepository.save(user);
-    }
-
-    private void setSecurityContext(String username) {
-        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
-                username, null,
-                Collections.singletonList(new SimpleGrantedAuthority(UserRole.USER.getAuthority()))
-        );
-        SecurityContextHolder.getContext().setAuthentication(auth);
     }
 }

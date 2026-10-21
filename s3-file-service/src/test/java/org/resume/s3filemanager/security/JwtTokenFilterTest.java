@@ -9,9 +9,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
+import org.resume.s3filemanager.enums.UserRole;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +24,7 @@ class JwtTokenFilterTest {
 
     private static final String TOKEN = "test.jwt.token";
     private static final String USERNAME = "john";
-    private static final String ROLE = "ROLE_CLIENT";
+    private static final String ROLE = UserRole.USER.getAuthority();
     private static final String PROTECTED_PATH = ApiPaths.FILES;
     private static final String PUBLIC_PATH = ApiPaths.AUTH + "/login";
 
@@ -119,7 +121,7 @@ class JwtTokenFilterTest {
     }
 
     /**
-     * Валидный токен: аутентификация в SecurityContext, запрос идёт дальше.
+     * Валидный токен: AuthenticatedUser в SecurityContext, запрос идёт дальше.
      */
     @Test
     void doFilterInternal_setsAuthentication_whenTokenValid() throws Exception {
@@ -134,8 +136,10 @@ class JwtTokenFilterTest {
 
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
-        assertThat(SecurityContextHolder.getContext().getAuthentication().getName()).isEqualTo(USERNAME);
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        assertThat(authentication.getName()).isEqualTo(USERNAME);
+        assertThat(authentication.getPrincipal()).isEqualTo(new AuthenticatedUser(USERNAME, UserRole.USER));
         assertThat(chain.getRequest()).isNotNull();
     }
 

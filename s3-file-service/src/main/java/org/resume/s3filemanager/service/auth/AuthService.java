@@ -18,7 +18,7 @@ import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.security.JwtCookieService;
 import org.resume.s3filemanager.security.JwtTokenService;
-import org.resume.s3filemanager.security.MySecurityUtils;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -94,10 +94,11 @@ public class AuthService {
      * <p>
      * Удаляет JWT токен из whitelist'а и очищает cookie на клиенте.
      *
+     * @param authenticatedUser пользователь текущего запроса
      * @param response HTTP ответ для очистки cookie
      */
-    public void logout(HttpServletResponse response) {
-        String username = MySecurityUtils.getCurrentUsername();
+    public void logout(AuthenticatedUser authenticatedUser, HttpServletResponse response) {
+        String username = authenticatedUser.username();
 
         jwtWhitelistService.deleteToken(username);
         jwtCookieService.clearAuthCookie(response);

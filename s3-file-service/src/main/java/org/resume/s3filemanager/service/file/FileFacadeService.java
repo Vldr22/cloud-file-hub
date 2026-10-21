@@ -13,6 +13,7 @@ import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
 import org.resume.s3filemanager.validation.FileValidator;
 import org.springframework.stereotype.Service;
@@ -57,13 +58,14 @@ public class FileFacadeService {
      * </ul>
      *
      * @param file загружаемый файл
+     * @param authenticatedUser пользователь текущего запроса
      * @throws FileUploadLimitException если пользователь уже загрузил файл
      * @throws DuplicateFileException если файл с таким хешем уже существует у пользователя
      * @throws S3YandexException при ошибке загрузки в S3
      */
     @Auditable(operation = AuditOperation.FILE_UPLOAD, resourceType = ResourceType.FILE)
-    public void uploadFile(MultipartFile file) {
-        User user = filePermissionService.checkUploadPermission();
+    public void uploadFile(MultipartFile file, AuthenticatedUser authenticatedUser) {
+        User user = filePermissionService.checkUploadPermission(authenticatedUser);
         uploadFileInternal(file, user);
     }
 
@@ -75,11 +77,12 @@ public class FileFacadeService {
      * должен быть успешно загружен.
      *
      * @param files загружаемые файлы; количество ограничено настройкой батча
+     * @param authenticatedUser пользователь текущего запроса
      * @return список результатов загрузки для каждого файла со статусом и сообщением
      * @throws MultipleFileUploadException если все файлы не прошли загрузку
      */
-    public List<MultipleUploadResponse> multipleUpload(MultipartFile[] files) {
-        User admin = filePermissionService.checkUploadPermission();
+    public List<MultipleUploadResponse> multipleUpload(MultipartFile[] files, AuthenticatedUser authenticatedUser) {
+        User admin = filePermissionService.checkUploadPermission(authenticatedUser);
 
         List<MultipleUploadResponse> results = new ArrayList<>();
         int successCount = 0;
@@ -140,14 +143,14 @@ public class FileFacadeService {
      * Сбрасывает статус загрузки пользователя на NOT_UPLOADED, если владелец удаляет файл.
      *
      * @param uniqueName уникальное имя файла на основе UUID
+     * @param authenticatedUser пользователь текущего запроса
      * @throws FileNotFoundException если файл не найден
      * @throws FileAccessDeniedException если пользователь пытается удалить чужой файл
      */
     @Auditable(operation = AuditOperation.FILE_DELETE, resourceType = ResourceType.FILE)
-    public void deleteFile(String uniqueName) {
-        User currentUser = filePermissionService.getCurrentUser();
+    public void deleteFile(String uniqueName, AuthenticatedUser authenticatedUser) {
         FileMetadata file = fileMetadataService.findByUniqueName(uniqueName);
-        filePermissionService.checkDeletePermission(currentUser, file);
+        filePermissionService.checkDeletePermission(authenticatedUser, file);
 
         fileStorageService.deleteFileYandexS3(uniqueName);
         fileMetadataService.deleteFileAndUpdateUserStatus(file);
