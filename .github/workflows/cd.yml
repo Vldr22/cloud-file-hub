@@ -125,7 +125,7 @@ jobs:
             set -e
             MAX_RETRIES=30
             RETRY_INTERVAL=15
-            URL="https://cloudfilehub.duckdns.org/api/home"
+            URL="https://cloudfilehub.duckdns.org/api/v1/home"
 
             for i in $(seq 1 $MAX_RETRIES); do
               echo "Health check attempt $i/$MAX_RETRIES..."

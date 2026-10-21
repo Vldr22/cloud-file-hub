@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.MdcConstants;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
 import org.resume.s3filemanager.dto.CommonResponse;
@@ -47,9 +48,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
     private final ObjectMapper objectMapper;
 
     private static final String[] PUBLIC_PATHS = {
-            "/api/auth/login",
-            "/api/auth/register",
-            "/api/home",
+            ApiPaths.AUTH + "/login",
+            ApiPaths.AUTH + "/register",
+            ApiPaths.HOME,
             "/swagger-ui",
             "/v3/api-docs"
     };
@@ -59,9 +60,9 @@ public class JwtTokenFilter extends OncePerRequestFilter {
      * <p>
      * Публичные пути не требуют аутентификации:
      * <ul>
-     *   <li>/api/auth/login</li>
-     *   <li>/api/auth/register</li>
-     *   <li>/api/home</li>
+     *   <li>/api/v1/auth/login</li>
+     *   <li>/api/v1/auth/register</li>
+     *   <li>/api/v1/home</li>
      * </ul>
      *
      * @param request HTTP запрос

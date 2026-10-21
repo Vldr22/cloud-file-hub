@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -22,7 +23,8 @@ class JwtTokenFilterTest {
     private static final String TOKEN = "test.jwt.token";
     private static final String USERNAME = "john";
     private static final String ROLE = "ROLE_CLIENT";
-    private static final String PROTECTED_PATH = "/api/files";
+    private static final String PROTECTED_PATH = ApiPaths.FILES;
+    private static final String PUBLIC_PATH = ApiPaths.AUTH + "/login";
 
     @Mock
     private JwtTokenService jwtTokenService;
@@ -143,7 +145,7 @@ class JwtTokenFilterTest {
      */
     @Test
     void shouldNotFilter_returnsTrue_forPublicPaths() {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", PUBLIC_PATH);
 
         assertThat(jwtTokenFilter.shouldNotFilter(request)).isTrue();
     }

@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
@@ -35,7 +36,7 @@ import java.util.List;
  */
 @Validated
 @RestController
-@RequestMapping("api/files")
+@RequestMapping(ApiPaths.FILES)
 @RequiredArgsConstructor
 @Tag(name = "Files", description = "Загрузка, скачивание и удаление файлов")
 public class FileController {

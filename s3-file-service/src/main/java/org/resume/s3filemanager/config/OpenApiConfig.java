@@ -37,7 +37,7 @@ public class OpenApiConfig {
     private static final String CONTACT_NAME = "Vladimir — GitHub";
     private static final String CONTACT_URL = "https://github.com/Vldr22/cloud-file-hub";
     private static final String DESCRIPTION_PATH = "/swagger-description.md";
-    private static final String JWT_DESCRIPTION = "JWT токен, полученный через POST /api/auth/login";
+    private static final String JWT_DESCRIPTION = "JWT токен, полученный через POST /api/v1/auth/login";
 
     @Bean
     public OpenAPI customOpenAPI() {

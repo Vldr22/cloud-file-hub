@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.AuthRequest;
 import org.resume.s3filemanager.dto.CommonResponse;
@@ -25,7 +26,7 @@ import org.springframework.web.bind.annotation.*;
  * @see AuthService
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping(ApiPaths.AUTH)
 @RequiredArgsConstructor
 @Tag(name = "Auth", description = "Регистрация, вход и выход из системы")
 public class AuthController {

@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.resume.common.model.ScanStatus;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.dto.*;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserStatus;
@@ -28,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
  * Доступен только администраторам.
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping(ApiPaths.ADMIN)
 @RequiredArgsConstructor
 @Tag(name = "Admin", description = "Администрирование пользователями, файлами и логами")
 public class AdminController {
