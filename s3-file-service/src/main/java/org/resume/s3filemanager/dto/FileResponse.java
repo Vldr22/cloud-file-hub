@@ -12,6 +12,6 @@ public record FileResponse(
         @Schema(description = "Уникальное имя файла в хранилище", example = "212d7ce9-8451-4c4d-881e-d198593aa518.png")
         String uniqueName,
 
-        @Schema(description = "Размер файла", example = "1.03 MB")
-        String fileSize) {
+        @Schema(description = "Размер файла в байтах", example = "1080033")
+        long fileSize) {
 }

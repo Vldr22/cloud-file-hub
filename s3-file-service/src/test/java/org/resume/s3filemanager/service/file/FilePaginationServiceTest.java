@@ -30,10 +30,7 @@ import static org.mockito.Mockito.when;
 class FilePaginationServiceTest {
 
     private static final Faker FAKER = new Faker();
-
-    private static final long ONE_MB = 1_048_576L;
-    private static final long ONE_AND_HALF_MB = 1_572_864L;
-    private static final long ONE_HUNDRED_KB = 102_400L; //
+    private static final long SIZE_BYTES = 2_097_152L;
 
     @Mock
     private FileMetadataRepository fileMetadataRepository;
@@ -45,15 +42,14 @@ class FilePaginationServiceTest {
     private FilePaginationService filePaginationService;
 
     /**
-     * Страница с файлами: DTO содержит правильные поля и размер в МБ.
+     * Страница с файлами: DTO содержит правильные поля и размер в байтах.
      */
     @Test
     void shouldReturnPageWithCorrectDto_whenFilesExist() {
-        long sizeBytes = 2_097_152L;
         FileMetadata file = FileMetadata.builder()
                 .originalName(FAKER.file().fileName())
                 .uniqueName(FAKER.internet().uuid() + ".pdf")
-                .size(sizeBytes)
+                .size(SIZE_BYTES)
                 .build();
 
         Pageable pageable = PageRequest.of(0, 10);
@@ -65,7 +61,7 @@ class FilePaginationServiceTest {
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().getFirst().fileName()).isEqualTo(file.getOriginalName());
         assertThat(result.getContent().getFirst().uniqueName()).isEqualTo(file.getUniqueName());
-        assertThat(result.getContent().getFirst().fileSize()).isEqualTo("2.00 MB");
+        assertThat(result.getContent().getFirst().fileSize()).isEqualTo(SIZE_BYTES);
 
         verify(fileMetadataRepository).findByScanStatus(ScanStatus.CLEAN, pageable);
     }
@@ -82,15 +78,5 @@ class FilePaginationServiceTest {
         Page<FileResponse> result = filePaginationService.paginate(pageable);
 
         assertThat(result.getContent()).isEmpty();
-    }
-
-    /**
-     * Конвертация байт в МБ: дробное значение округляется до двух знаков.
-     */
-    @Test
-    void shouldFormatSizeCorrectly_whenConvertingBytesToMb() {
-        assertThat(fileMapper.toMegabytes(ONE_MB)).isEqualTo("1.00 MB");
-        assertThat(fileMapper.toMegabytes(ONE_AND_HALF_MB)).isEqualTo("1.50 MB");
-        assertThat(fileMapper.toMegabytes(ONE_HUNDRED_KB)).isEqualTo("0.10 MB");
     }
 }
