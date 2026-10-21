@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.resume.s3filemanager.BaseIntegrationTest;
 import org.resume.s3filemanager.dto.AuthRequest;
-import org.resume.s3filemanager.dto.LoginResponse;
+import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
@@ -71,7 +71,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     // REGISTER
 
     /**
-     * Успешная регистрация — пользователь сохраняется в Postgres ролью USER и статусом NOT_UPLOADED.
+     * Успешная регистрация: пользователь в Postgres с ролью USER и статусом NOT_UPLOADED.
      */
     @Test
     void shouldRegister_andPersistUserInDatabase() {
@@ -89,7 +89,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     }
 
     /**
-     * Повторная регистрация с тем же именем — UserAlreadyExistsException, второй записи в БД не появляется.
+     * Повторная регистрация с тем же именем: UserAlreadyExistsException, второй записи в БД нет.
      */
     @Test
     void shouldThrowUserAlreadyExistsException_whenUsernameIsTaken() {
@@ -104,24 +104,24 @@ class AuthServiceIT extends BaseIntegrationTest {
 
     // LOGIN
     /**
-     * Успешный вход — токен сохраняется в Redis whitelist, ответ содержит корректный username и роль.
+     * Успешный вход: токен в Redis whitelist, в ответе username и роль.
      */
     @Test
     void shouldLogin_andSaveTokenInRedis() {
         createActiveUser();
         AuthRequest request = new AuthRequest(username, password);
 
-        LoginResponse loginResponse = authService.login(request, response);
+        UserDetailsResponse loginResponse = authService.login(request, response);
         String token = captureCookieToken(response);
 
-        assertThat(loginResponse.login()).isEqualTo(username);
-        assertThat(loginResponse.role()).isEqualTo(UserRole.USER.getAuthority());
+        assertThat(loginResponse.username()).isEqualTo(username);
+        assertThat(loginResponse.role()).isEqualTo(UserRole.USER);
         assertThat(token).isNotBlank();
         assertThat(jwtWhitelistService.isValid(username, token)).isTrue();
     }
 
     /**
-     * Вход заблокированного пользователя — UserBlockedException, токен в Redis не появляется.
+     * Вход заблокированного пользователя: UserBlockedException, токена в Redis нет.
      */
     @Test
     void shouldThrowUserBlockedException_whenUserIsBlocked() {
@@ -135,7 +135,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     }
 
     /**
-     * Неверный пароль — BadCredentialsException, токен в Redis не появляется.
+     * Неверный пароль: BadCredentialsException, токена в Redis нет.
      */
     @Test
     void shouldThrowBadCredentialsException_whenPasswordIsWrong() {
@@ -150,7 +150,7 @@ class AuthServiceIT extends BaseIntegrationTest {
 
     // LOGOUT
     /**
-     * Успешный выход — токен удаляется из Redis whitelist.
+     * Успешный выход удаляет токен из Redis whitelist.
      */
     @Test
     void shouldLogout_andRemoveTokenFromRedis() {
@@ -167,7 +167,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     }
 
     /**
-     * Повторный вход после выхода — новый токен валиден, старый токен инвалидирован.
+     * Повторный вход после выхода: новый токен валиден, старый инвалидирован.
      */
     @Test
     void shouldIssueNewToken_afterLogoutAndLoginAgain() {

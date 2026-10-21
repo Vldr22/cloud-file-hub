@@ -12,7 +12,7 @@ import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.AuthRequest;
 import org.resume.s3filemanager.dto.CommonResponse;
-import org.resume.s3filemanager.dto.LoginResponse;
+import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.service.auth.AuthService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -41,9 +41,8 @@ public class AuthController {
     })
     @SecurityRequirements
     @PostMapping("/login")
-    public CommonResponse<LoginResponse> login(@Valid @RequestBody AuthRequest request, HttpServletResponse response) {
-        LoginResponse loginResponse = authService.login(request, response);
-        return CommonResponse.success(loginResponse);
+    public CommonResponse<UserDetailsResponse> login(@Valid @RequestBody AuthRequest request, HttpServletResponse response) {
+        return CommonResponse.success(authService.login(request, response));
     }
 
     @Operation(summary = "Регистрация", description = "Создаёт нового пользователя с ролью USER")

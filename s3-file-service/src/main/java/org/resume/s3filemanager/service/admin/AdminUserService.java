@@ -5,6 +5,7 @@ import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserStatus;
+import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.service.auth.UserService;
 import org.springframework.data.domain.Page;
@@ -20,6 +21,7 @@ public class AdminUserService {
 
     private final UserService userService;
     private final JwtWhitelistService jwtWhitelistService;
+    private final UserMapper userMapper;
 
     /**
      * Возвращает список всех пользователей.
@@ -29,7 +31,7 @@ public class AdminUserService {
      */
     public Page<UserDetailsResponse> getUsers(Pageable pageable) {
         return userService.findAll(pageable)
-                .map(this::toUserDetailsResponse);
+                .map(userMapper::toUserDetailsResponse);
     }
 
     /**
@@ -48,7 +50,7 @@ public class AdminUserService {
             jwtWhitelistService.deleteToken(user.getUsername());
         }
 
-        return toUserDetailsResponse(user);
+        return userMapper.toUserDetailsResponse(user);
     }
 
     /**
@@ -61,7 +63,7 @@ public class AdminUserService {
     public UserDetailsResponse changeFileUploadStatus(Long userId, FileUploadStatus uploadStatus) {
         User user = userService.findById(userId);
         userService.updateStatus(user, uploadStatus);
-        return toUserDetailsResponse(user);
+        return userMapper.toUserDetailsResponse(user);
     }
 
     /**
@@ -74,15 +76,5 @@ public class AdminUserService {
         User user = userService.findById(userId);
         jwtWhitelistService.deleteToken(user.getUsername());
         userService.delete(user);
-    }
-
-    private UserDetailsResponse toUserDetailsResponse(User user) {
-        return UserDetailsResponse.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .role(user.getRole())
-                .status(user.getStatus())
-                .uploadStatus(user.getUploadStatus())
-                .build();
     }
 }

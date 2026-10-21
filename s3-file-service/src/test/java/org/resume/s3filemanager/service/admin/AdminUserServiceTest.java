@@ -7,12 +7,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.enums.UserStatus;
+import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.service.auth.UserService;
 import org.springframework.data.domain.Page;
@@ -36,6 +38,9 @@ class AdminUserServiceTest {
 
     @Mock
     private JwtWhitelistService jwtWhitelistService;
+
+    @Spy
+    private UserMapper userMapper;
 
     @InjectMocks
     private AdminUserService adminUserService;

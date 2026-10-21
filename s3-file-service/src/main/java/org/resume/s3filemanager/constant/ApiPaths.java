@@ -14,4 +14,5 @@ public class ApiPaths {
     public static final String FILES = API_V1 + "/files";
     public static final String HOME = API_V1 + "/home";
     public static final String ADMIN = API_V1 + "/admin";
+    public static final String USERS = API_V1 + "/users";
 }

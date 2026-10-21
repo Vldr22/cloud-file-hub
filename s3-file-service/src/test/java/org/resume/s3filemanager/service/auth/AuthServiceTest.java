@@ -8,15 +8,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.dto.AuthRequest;
-import org.resume.s3filemanager.dto.LoginResponse;
+import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserBlockedException;
+import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtCookieService;
 import org.resume.s3filemanager.security.JwtTokenService;
 import org.resume.s3filemanager.security.JwtWhitelistService;
@@ -53,6 +55,9 @@ class AuthServiceTest {
     @Mock
     private HttpServletResponse httpServletResponse;
 
+    @Spy
+    private UserMapper userMapper;
+
     @InjectMocks
     private AuthService authService;
 
@@ -78,7 +83,7 @@ class AuthServiceTest {
     }
 
     /**
-     * Успешный вход — токен генерируется, whitelist обновляется, cookie устанавливается.
+     * Успешный вход: токен в whitelist и cookie, в ответе данные пользователя.
      */
     @Test
     void shouldLogin_whenCredentialsAreValid() {
@@ -87,17 +92,30 @@ class AuthServiceTest {
         when(jwtTokenService.generateToken(user.getUsername(), user.getRole())).thenReturn(token);
         when(jwtTokenService.getExpirationSeconds()).thenReturn(3600L);
 
-        LoginResponse response = authService.login(authRequest, httpServletResponse);
+        UserDetailsResponse response = authService.login(authRequest, httpServletResponse);
 
-        assertThat(response.login()).isEqualTo(user.getUsername());
-        assertThat(response.role()).isEqualTo(UserRole.USER.getAuthority());
+        assertThat(response.username()).isEqualTo(user.getUsername());
+        assertThat(response.role()).isEqualTo(UserRole.USER);
 
         verify(jwtWhitelistService).saveToken(eq(user.getUsername()), eq(token), eq(3600L));
         verify(jwtCookieService).setAuthCookie(eq(httpServletResponse), eq(token));
     }
 
     /**
-     * Пользователь заблокирован - UserBlockedException после проверки пароля.
+     * Текущий пользователь находится по имени и возвращается как DTO.
+     */
+    @Test
+    void shouldReturnCurrentUser_whenUserExists() {
+        when(userService.findByUsername(user.getUsername())).thenReturn(user);
+
+        UserDetailsResponse response = authService.getCurrentUser(user.getUsername());
+
+        assertThat(response.username()).isEqualTo(user.getUsername());
+        assertThat(response.uploadStatus()).isEqualTo(FileUploadStatus.NOT_UPLOADED);
+    }
+
+    /**
+     * Пользователь заблокирован: UserBlockedException после проверки пароля.
      */
     @Test
     void shouldThrowUserBlockedException_whenUserIsBlocked() {
@@ -112,7 +130,7 @@ class AuthServiceTest {
     }
 
     /**
-     * Неверный пароль — BadCredentialsException.
+     * Неверный пароль: BadCredentialsException.
      */
     @Test
     void shouldThrowBadCredentialsException_whenPasswordIsWrong() {
@@ -126,7 +144,7 @@ class AuthServiceTest {
     }
 
     /**
-     * Успешная регистрация — делегирует создание пользователя в UserService.
+     * Успешная регистрация делегирует создание пользователя в UserService.
      */
     @Test
     void shouldRegister_whenUsernameIsUnique() {
@@ -136,7 +154,7 @@ class AuthServiceTest {
     }
 
     /**
-     * Регистрация с занятым именем — UserAlreadyExistsException.
+     * Регистрация с занятым именем: UserAlreadyExistsException.
      */
     @Test
     void shouldThrowUserAlreadyExistsException_whenUsernameIsTaken() {

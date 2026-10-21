@@ -8,12 +8,13 @@ import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
 import org.resume.s3filemanager.dto.AuthRequest;
-import org.resume.s3filemanager.dto.LoginResponse;
+import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserBlockedException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
+import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.security.JwtCookieService;
 import org.resume.s3filemanager.security.JwtTokenService;
@@ -23,14 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 /**
- * Сервис для аутентификации и авторизации пользователей.
- * <p>
- * Управляет процессами входа в систему, регистрации и выхода,
- * включая генерацию JWT токенов и управление whitelist'ом токенов.
- *
- * @see JwtTokenService
- * @see JwtWhitelistService
- * @see UserService
+ * Вход, регистрация, выход и данные текущего пользователя.
  */
 @Slf4j
 @Service
@@ -42,6 +36,7 @@ public class AuthService {
     private final JwtWhitelistService jwtWhitelistService;
     private final JwtCookieService jwtCookieService;
     private final UserService userService;
+    private final UserMapper userMapper;
 
     /**
      * Выполняет вход пользователя в систему.
@@ -51,12 +46,12 @@ public class AuthService {
      *
      * @param request запрос с именем пользователя и паролем
      * @param response HTTP ответ для установки cookie
-     * @return имя пользователя и роль
+     * @return данные вошедшего пользователя
      * @throws UserNotFoundException если пользователь не найден
      * @throws UserBlockedException если пользователь заблокирован
      * @throws BadCredentialsException если учетные данные неверны
      */
-    public LoginResponse login(AuthRequest request, HttpServletResponse response) {
+    public UserDetailsResponse login(AuthRequest request, HttpServletResponse response) {
         User user = verifyCredentials(request.username(), request.password());
 
         String token = jwtTokenService.generateToken(user.getUsername(), user.getRole());
@@ -70,7 +65,14 @@ public class AuthService {
         jwtCookieService.setAuthCookie(response, token);
 
         log.info("User logged in successfully: {}", user.getUsername());
-        return new LoginResponse(user.getUsername(), user.getRole().getAuthority());
+        return userMapper.toUserDetailsResponse(user);
+    }
+
+    /**
+     * Возвращает данные текущего пользователя.
+     */
+    public UserDetailsResponse getCurrentUser(String username) {
+        return userMapper.toUserDetailsResponse(userService.findByUsername(username));
     }
 
     /**
