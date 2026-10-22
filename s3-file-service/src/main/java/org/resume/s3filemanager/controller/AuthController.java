@@ -1,6 +1,7 @@
 package org.resume.s3filemanager.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
@@ -8,12 +9,16 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SuccessMessages;
-import org.resume.s3filemanager.dto.AuthRequest;
 import org.resume.s3filemanager.dto.CommonResponse;
-import org.resume.s3filemanager.dto.LoginResponse;
+import org.resume.s3filemanager.dto.LoginRequest;
+import org.resume.s3filemanager.dto.RegisterRequest;
+import org.resume.s3filemanager.dto.UserDetailsResponse;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.auth.AuthService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,7 +30,7 @@ import org.springframework.web.bind.annotation.*;
  * @see AuthService
  */
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping(ApiPaths.AUTH)
 @RequiredArgsConstructor
 @Tag(name = "Auth", description = "Регистрация, вход и выход из системы")
 public class AuthController {
@@ -40,9 +45,8 @@ public class AuthController {
     })
     @SecurityRequirements
     @PostMapping("/login")
-    public CommonResponse<LoginResponse> login(@Valid @RequestBody AuthRequest request, HttpServletResponse response) {
-        LoginResponse loginResponse = authService.login(request, response);
-        return CommonResponse.success(loginResponse);
+    public CommonResponse<UserDetailsResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
+        return CommonResponse.success(authService.login(request, response));
     }
 
     @Operation(summary = "Регистрация", description = "Создаёт нового пользователя с ролью USER")
@@ -54,7 +58,7 @@ public class AuthController {
     @SecurityRequirements
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<String> register(@Valid @RequestBody AuthRequest request) {
+    public CommonResponse<String> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
         return CommonResponse.success(SuccessMessages.REGISTRATION_SUCCESS);
     }
@@ -65,8 +69,10 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк")
     })
     @PostMapping("/logout")
-    public CommonResponse<String> logout(HttpServletResponse response) {
-        authService.logout(response);
+    public CommonResponse<String> logout(
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            HttpServletResponse response) {
+        authService.logout(authenticatedUser, response);
         return CommonResponse.success(SuccessMessages.LOGOUT_SUCCESS);
     }
 }

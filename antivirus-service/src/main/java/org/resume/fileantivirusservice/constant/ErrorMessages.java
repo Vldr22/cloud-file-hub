@@ -16,6 +16,9 @@ public class ErrorMessages {
     public static final String CLAMAV_UNAVAILABLE = "ClamAV service unavailable";
     public static final String CLAMAV_UNKNOWN_RESULT = "Unknown scan result type";
 
+    // === Kafka Errors ===
+    public static final String KAFKA_SEND_FAILED = "Failed to send scan result to Kafka";
+
     // === DLQ Errors ===
     public static final String DLQ_SCAN_FAILED = "File scan failed after multiple retry attempts";
 }

@@ -8,14 +8,15 @@ info:
 
     **Аутентификация**
     * Публичный доступ — просмотр списка файлов и скачивание без регистрации
-    * Вход через `POST /api/auth/login` — JWT токен устанавливается в HttpOnly cookie
+    * Вход через `POST /api/v1/auth/login` — JWT токен устанавливается в HttpOnly cookie
     * Все остальные защищённые endpoints требуют валидный JWT токен в cookie
+    * В Swagger UI кнопка Authorize не нужна: после логина браузер сам отправляет cookie
 
     ---
 
     **Уровни доступа**
-    * `ROLE_USER` — загрузка 1 файла, удаление только своих файлов
-    * `ROLE_ADMIN` — загрузка до 5 файлов, удаление любых файлов, управление пользователями, просмотр аудит-логов и статистики
+    * `USER` — загрузка 1 файла, удаление только своих файлов
+    * `ADMIN` — загрузка до 5 файлов, удаление любых файлов, управление пользователями, просмотр аудит-логов и статистики
     * Публичный доступ — просмотр и скачивание файлов без регистрации
 
     ---
@@ -27,7 +28,7 @@ info:
     {
       "data": {},
       "status": "SUCCESS",
-      "timestamp": "2026-03-11T03:41:17.639342344"
+      "timestamp": "2026-10-22T10:15:30.639Z"
     }
     ```
 
@@ -41,7 +42,7 @@ info:
         "status": 404,
         "detail": "File not found"
       },
-      "timestamp": "2026-03-11T03:41:17.639342344"
+      "timestamp": "2026-10-22T10:15:30.639Z"
     }
     ```
 
@@ -62,8 +63,10 @@ servers:
 - url: https://cloudfilehub.duckdns.org
   description: Production (VPS)
 security:
-- Bearer Authentication: []
+- Cookie Authentication: []
 tags:
+- name: Users
+  description: Данные и файлы текущего пользователя
 - name: Home
   description: Публичный доступ к списку файлов без аутентификации
 - name: Admin
@@ -78,7 +81,7 @@ tags:
 - name: Files
   description: "Загрузка, скачивание и удаление файлов"
 paths:
-  /api/admin/users/{userId}/status:
+  /api/v1/admin/users/{userId}/status:
     put:
       tags:
       - Admin
@@ -141,6 +144,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -153,7 +168,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
-  /api/admin/users/{userId}/file-upload-status:
+  /api/v1/admin/users/{userId}/file-upload-status:
     put:
       tags:
       - Admin
@@ -217,6 +232,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -229,7 +256,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
-  /api/files/upload:
+  /api/v1/files/upload:
     post:
       tags:
       - Files
@@ -286,6 +313,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -293,32 +332,28 @@ paths:
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
         "201":
-          description: Файл загружен
+          description: Файл загружен и ожидает антивирусной проверки
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/CommonResponseString"
-  /api/files/multiple-upload:
+                $ref: "#/components/schemas/CommonResponseFileResponse"
+  /api/v1/files/multiple-upload:
     post:
       tags:
       - Files
       summary: Множественная загрузка
       description: Загружает до 5 файлов. Только для администраторов
       operationId: multipleUpload
-      requestBody:
-        content:
-          multipart/form-data:
-            schema:
-              required:
-              - files
-              type: object
-              properties:
-                files:
-                  type: array
-                  description: Файлы для загрузки (до 5)
-                  items:
-                    type: string
-                    format: binary
+      parameters:
+      - name: files
+        in: query
+        description: Файлы для загрузки (до 5)
+        required: true
+        schema:
+          type: array
+          items:
+            type: string
+            format: binary
       responses:
         "409":
           description: Conflict
@@ -356,6 +391,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -368,7 +415,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseListMultipleUploadResponse"
-  /api/auth/register:
+  /api/v1/auth/register:
     post:
       tags:
       - Auth
@@ -379,7 +426,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AuthRequest"
+              $ref: "#/components/schemas/RegisterRequest"
         required: true
       responses:
         "409":
@@ -418,6 +465,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Unauthorized
           content:
@@ -431,7 +490,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CommonResponseString"
       security: []
-  /api/auth/logout:
+  /api/v1/auth/logout:
     post:
       tags:
       - Auth
@@ -475,6 +534,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -487,7 +558,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseString"
-  /api/auth/login:
+  /api/v1/auth/login:
     post:
       tags:
       - Auth
@@ -498,7 +569,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AuthRequest"
+              $ref: "#/components/schemas/LoginRequest"
         required: true
       responses:
         "409":
@@ -537,6 +608,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Неверные учётные данные
           content:
@@ -548,9 +631,9 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/CommonResponseLoginResponse"
+                $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
       security: []
-  /api/admin/files/{fileId}/retry-scan:
+  /api/v1/admin/files/{fileId}/retry-scan:
     post:
       tags:
       - Admin
@@ -603,6 +686,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -615,7 +710,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseAdminFileResponse"
-  /api/admin/files/retry-dlt:
+  /api/v1/admin/files/retry-dlt:
     post:
       tags:
       - Admin
@@ -660,6 +755,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -672,29 +779,13 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseInteger"
-  /api/admin/audit-logs:
-    post:
+  /api/v1/users/me:
+    get:
       tags:
-      - Admin
-      summary: Журнал аудита
-      description: "Возвращает логи с фильтрацией по пользователю, операции, стату\
-        су и дате"
-      operationId: getAuditLogs
-      parameters:
-      - name: page
-        in: query
-        description: Номер страницы
-        example: 0
-      - name: size
-        in: query
-        description: Размер страницы
-        example: 20
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AuditLogFilter"
-        required: true
+      - Users
+      summary: Текущий пользователь
+      description: "Возвращает имя, роль и статус загрузки по JWT из cookie"
+      operationId: getCurrentUser
       responses:
         "409":
           description: Conflict
@@ -703,7 +794,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
         "403":
-          description: Недостаточно прав
+          description: Forbidden
           content:
             '*/*':
               schema:
@@ -732,6 +823,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -743,8 +846,85 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PageAuditLogResponse"
-  /api/home:
+                $ref: "#/components/schemas/CommonResponseUserDetailsResponse"
+  /api/v1/users/me/files:
+    get:
+      tags:
+      - Users
+      summary: Мои файлы
+      description: Файлы текущего пользователя с любым статусом антивирусной проверки
+      operationId: getCurrentUserFiles
+      parameters:
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Forbidden
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Bad Request
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponsePageResponseFileResponse"
+  /api/v1/home:
     get:
       tags:
       - Home
@@ -797,6 +977,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Unauthorized
           content:
@@ -808,9 +1000,9 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PageFileResponse"
+                $ref: "#/components/schemas/CommonResponsePageResponseFileResponse"
       security: []
-  /api/files/{uniqueName}:
+  /api/v1/files/{uniqueName}:
     get:
       tags:
       - Files
@@ -858,6 +1050,18 @@ paths:
                 $ref: "#/components/schemas/CommonResponseVoid"
         "413":
           description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
           content:
             '*/*':
               schema:
@@ -928,6 +1132,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -936,7 +1152,7 @@ paths:
                 $ref: "#/components/schemas/CommonResponseVoid"
         "204":
           description: Файл удалён
-  /api/admin/users:
+  /api/v1/admin/users:
     get:
       tags:
       - Admin
@@ -989,6 +1205,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -1000,8 +1228,8 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PageUserDetailsResponse"
-  /api/admin/files/stats:
+                $ref: "#/components/schemas/CommonResponsePageResponseUserDetailsResponse"
+  /api/v1/admin/files/stats:
     get:
       tags:
       - Admin
@@ -1045,6 +1273,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -1057,7 +1297,7 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseFileStatsResponse"
-  /api/admin/files/scan-status:
+  /api/v1/admin/files/scan-status:
     get:
       tags:
       - Admin
@@ -1122,6 +1362,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -1133,7 +1385,7 @@ paths:
           content:
             '*/*':
               schema:
-                $ref: "#/components/schemas/PageAdminFileResponse"
+                $ref: "#/components/schemas/CommonResponsePageResponseAdminFileResponse"
     delete:
       tags:
       - Admin
@@ -1191,6 +1443,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -1203,7 +1467,130 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseInteger"
-  /api/admin/users/{userId}:
+  /api/v1/admin/audit-logs:
+    get:
+      tags:
+      - Admin
+      summary: Журнал аудита
+      description: "Возвращает логи с фильтрацией по пользователю, операции, стату\
+        су и дате"
+      operationId: getAuditLogs
+      parameters:
+      - name: username
+        in: query
+        description: Имя пользователя
+        required: false
+        schema:
+          type: string
+          description: Имя пользователя
+          example: Sara
+        example: Sara
+      - name: operation
+        in: query
+        description: Тип операции
+        required: false
+        schema:
+          type: string
+          description: Тип операции
+          example: FILE_UPLOAD
+        example: FILE_UPLOAD
+      - name: status
+        in: query
+        description: Статус операции
+        required: false
+        schema:
+          type: string
+          description: Статус операции
+          example: SUCCESS
+        example: SUCCESS
+      - name: from
+        in: query
+        description: Начало периода
+        required: false
+        schema:
+          type: string
+          description: Начало периода
+          example: 2026-10-01T00:00:00Z
+        example: 2026-10-01T00:00:00Z
+      - name: to
+        in: query
+        description: Конец периода
+        required: false
+        schema:
+          type: string
+          description: Конец периода
+          example: 2026-10-31T23:59:59Z
+        example: 2026-10-31T23:59:59Z
+      - name: page
+        in: query
+        description: Номер страницы
+        example: 0
+      - name: size
+        in: query
+        description: Размер страницы
+        example: 20
+      responses:
+        "409":
+          description: Conflict
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "403":
+          description: Недостаточно прав
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "404":
+          description: Not Found
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "400":
+          description: Начало периода позже конца
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "500":
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "413":
+          description: Payload Too Large
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "401":
+          description: Токен отсутствует или истёк
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "200":
+          description: Успешно
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponsePageResponseAuditLogResponse"
+  /api/v1/admin/users/{userId}:
     delete:
       tags:
       - Admin
@@ -1256,6 +1643,18 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CommonResponseVoid"
+        "405":
+          description: Method Not Allowed
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
+        "415":
+          description: Unsupported Media Type
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CommonResponseVoid"
         "401":
           description: Токен отсутствует или истёк
           content:
@@ -1285,6 +1684,7 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
     ProblemDetail:
       type: object
@@ -1325,6 +1725,7 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
     UserDetailsResponse:
       type: object
@@ -1361,12 +1762,11 @@ components:
           - NOT_UPLOADED
           - FILE_UPLOADED
       description: Информация о пользователе
-    CommonResponseString:
+    CommonResponseFileResponse:
       type: object
       properties:
         data:
-          type: string
-          description: Данные ответа
+          $ref: "#/components/schemas/FileResponse"
         status:
           type: string
           description: Статус ответа
@@ -1380,7 +1780,39 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
+    FileResponse:
+      type: object
+      properties:
+        fileName:
+          type: string
+          description: Оригинальное имя файла
+          example: photo.png
+        uniqueName:
+          type: string
+          description: Уникальное имя файла в хранилище
+          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
+        fileSize:
+          type: integer
+          description: Размер файла в байтах
+          format: int64
+          example: 1080033
+        scanStatus:
+          type: string
+          description: Статус антивирусной проверки
+          example: CLEAN
+          enum:
+          - PENDING_SCAN
+          - CLEAN
+          - INFECTED
+          - ERROR
+        uploadedAt:
+          type: string
+          description: Время загрузки
+          format: date-time
+          example: 2026-10-22T10:15:30Z
+      description: Информация о файле
     CommonResponseListMultipleUploadResponse:
       type: object
       properties:
@@ -1402,6 +1834,7 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
     MultipleUploadResponse:
       type: object
@@ -1426,7 +1859,7 @@ components:
           description: Сообщение об ошибке
           example: File already been uploaded
       description: Результат загрузки одного файла из batch-запроса
-    AuthRequest:
+    RegisterRequest:
       required:
       - password
       - username
@@ -1440,16 +1873,17 @@ components:
           example: Sara
         password:
           maxLength: 50
-          minLength: 3
+          minLength: 8
           type: string
           description: Пароль
           example: secret123
-      description: Запрос на аутентификацию
-    CommonResponseLoginResponse:
+      description: Запрос на регистрацию
+    CommonResponseString:
       type: object
       properties:
         data:
-          $ref: "#/components/schemas/LoginResponse"
+          type: string
+          description: Данные ответа
         status:
           type: string
           description: Статус ответа
@@ -1463,23 +1897,27 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
-    LoginResponse:
+    LoginRequest:
+      required:
+      - password
+      - username
       type: object
       properties:
-        token:
-          type: string
-          description: JWT токен
-          example: eyJhbGciOiJIUzI1NiJ9...
-        login:
+        username:
+          maxLength: 50
+          minLength: 0
           type: string
           description: Имя пользователя
           example: Sara
-        role:
+        password:
+          maxLength: 50
+          minLength: 0
           type: string
-          description: Роль пользователя
-          example: ROLE_USER
-      description: Ответ при успешной аутентификации
+          description: Пароль
+          example: secret123
+      description: Запрос на вход
     AdminFileResponse:
       type: object
       properties:
@@ -1497,9 +1935,10 @@ components:
           description: Уникальное имя файла в хранилище
           example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
         fileSize:
-          type: string
-          description: Размер файла
-          example: 1.03 MB
+          type: integer
+          description: Размер файла в байтах
+          format: int64
+          example: 1080033
         type:
           type: string
           description: MIME тип файла
@@ -1517,6 +1956,11 @@ components:
           type: string
           description: Имя пользователя загрузившего файл
           example: Sara
+        uploadedAt:
+          type: string
+          description: Время загрузки
+          format: date-time
+          example: 2026-10-22T10:15:30Z
       description: Расширенная информация о файле для администратора
     CommonResponseAdminFileResponse:
       type: object
@@ -1536,6 +1980,7 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
     CommonResponseInteger:
       type: object
@@ -1557,39 +2002,204 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
-    AuditLogFilter:
+    CommonResponsePageResponseFileResponse:
       type: object
       properties:
-        username:
-          type: string
-          description: Имя пользователя
-          example: Sara
-        operation:
-          type: string
-          description: Тип операции
-          example: FILE_UPLOAD
-          enum:
-          - REGISTER
-          - FILE_UPLOAD
-          - FILE_DOWNLOAD
-          - FILE_DELETE
+        data:
+          $ref: "#/components/schemas/PageResponseFileResponse"
         status:
           type: string
-          description: Статус операции
+          description: Статус ответа
           example: SUCCESS
           enum:
           - SUCCESS
           - ERROR
-        from:
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
           type: string
-          description: Начало периода
+          description: Время ответа
           format: date-time
-        to:
+          example: 2026-10-22T10:15:30.639Z
+      description: Общий формат ответа API
+    PageResponseFileResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          description: Элементы страницы
+          items:
+            $ref: "#/components/schemas/FileResponse"
+        page:
+          type: integer
+          description: "Номер страницы, с 0"
+          format: int32
+          example: 0
+        size:
+          type: integer
+          description: Размер страницы
+          format: int32
+          example: 20
+        totalElements:
+          type: integer
+          description: Всего элементов
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          description: Всего страниц
+          format: int32
+          example: 3
+      description: Страница результатов
+    CommonResponsePageResponseUserDetailsResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PageResponseUserDetailsResponse"
+        status:
           type: string
-          description: Начало периода
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
           format: date-time
-      description: Фильтр для получения аудит-логов
+          example: 2026-10-22T10:15:30.639Z
+      description: Общий формат ответа API
+    PageResponseUserDetailsResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          description: Элементы страницы
+          items:
+            $ref: "#/components/schemas/UserDetailsResponse"
+        page:
+          type: integer
+          description: "Номер страницы, с 0"
+          format: int32
+          example: 0
+        size:
+          type: integer
+          description: Размер страницы
+          format: int32
+          example: 20
+        totalElements:
+          type: integer
+          description: Всего элементов
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          description: Всего страниц
+          format: int32
+          example: 3
+      description: Страница результатов
+    CommonResponseFileStatsResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/FileStatsResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+          example: 2026-10-22T10:15:30.639Z
+      description: Общий формат ответа API
+    FileStatsResponse:
+      type: object
+      properties:
+        pending:
+          type: integer
+          description: Файлы ожидающие проверки
+          format: int64
+          example: 5
+        clean:
+          type: integer
+          description: Чистые файлы
+          format: int64
+          example: 100
+        infected:
+          type: integer
+          description: Заражённые файлы
+          format: int64
+          example: 2
+        error:
+          type: integer
+          description: Файлы с ошибкой проверки
+          format: int64
+          example: 1
+        total:
+          type: integer
+          description: Всего файлов
+          format: int64
+          example: 108
+      description: Статистика файлов по статусам антивирусной проверки
+    CommonResponsePageResponseAdminFileResponse:
+      type: object
+      properties:
+        data:
+          $ref: "#/components/schemas/PageResponseAdminFileResponse"
+        status:
+          type: string
+          description: Статус ответа
+          example: SUCCESS
+          enum:
+          - SUCCESS
+          - ERROR
+        problemDetail:
+          $ref: "#/components/schemas/ProblemDetail"
+        timestamp:
+          type: string
+          description: Время ответа
+          format: date-time
+          example: 2026-10-22T10:15:30.639Z
+      description: Общий формат ответа API
+    PageResponseAdminFileResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          description: Элементы страницы
+          items:
+            $ref: "#/components/schemas/AdminFileResponse"
+        page:
+          type: integer
+          description: "Номер страницы, с 0"
+          format: int32
+          example: 0
+        size:
+          type: integer
+          description: Размер страницы
+          format: int32
+          example: 20
+        totalElements:
+          type: integer
+          description: Всего элементов
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          description: Всего страниц
+          format: int32
+          example: 3
+      description: Страница результатов
     AuditLogResponse:
       type: object
       properties:
@@ -1647,150 +2257,11 @@ components:
           description: Время операции
           format: date-time
       description: Запись аудит-лога
-    PageAuditLogResponse:
-      type: object
-      properties:
-        totalPages:
-          type: integer
-          format: int32
-        totalElements:
-          type: integer
-          format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/AuditLogResponse"
-        number:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    PageableObject:
-      type: object
-      properties:
-        paged:
-          type: boolean
-        pageNumber:
-          type: integer
-          format: int32
-        pageSize:
-          type: integer
-          format: int32
-        offset:
-          type: integer
-          format: int64
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        unpaged:
-          type: boolean
-    SortObject:
-      type: object
-      properties:
-        sorted:
-          type: boolean
-        empty:
-          type: boolean
-        unsorted:
-          type: boolean
-    FileResponse:
-      type: object
-      properties:
-        fileName:
-          type: string
-          description: Оригинальное имя файла
-          example: photo.png
-        uniqueName:
-          type: string
-          description: Уникальное имя файла в хранилище
-          example: 212d7ce9-8451-4c4d-881e-d198593aa518.png
-        fileSize:
-          type: string
-          description: Размер файла
-          example: 1.03 MB
-      description: Информация о файле
-    PageFileResponse:
-      type: object
-      properties:
-        totalPages:
-          type: integer
-          format: int32
-        totalElements:
-          type: integer
-          format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/FileResponse"
-        number:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    PageUserDetailsResponse:
-      type: object
-      properties:
-        totalPages:
-          type: integer
-          format: int32
-        totalElements:
-          type: integer
-          format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        size:
-          type: integer
-          format: int32
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserDetailsResponse"
-        number:
-          type: integer
-          format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        numberOfElements:
-          type: integer
-          format: int32
-        empty:
-          type: boolean
-    CommonResponseFileStatsResponse:
+    CommonResponsePageResponseAuditLogResponse:
       type: object
       properties:
         data:
-          $ref: "#/components/schemas/FileStatsResponse"
+          $ref: "#/components/schemas/PageResponseAuditLogResponse"
         status:
           type: string
           description: Статус ответа
@@ -1804,71 +2275,40 @@ components:
           type: string
           description: Время ответа
           format: date-time
+          example: 2026-10-22T10:15:30.639Z
       description: Общий формат ответа API
-    FileStatsResponse:
+    PageResponseAuditLogResponse:
       type: object
       properties:
-        pending:
-          type: integer
-          description: Файлы ожидающие проверки
-          format: int64
-          example: 5
-        clean:
-          type: integer
-          description: Чистые файлы
-          format: int64
-          example: 100
-        infected:
-          type: integer
-          description: Заражённые файлы
-          format: int64
-          example: 2
-        error:
-          type: integer
-          description: Файлы с ошибкой проверки
-          format: int64
-          example: 1
-        total:
-          type: integer
-          description: Всего файлов
-          format: int64
-          example: 108
-      description: Статистика файлов по статусам антивирусной проверки
-    PageAdminFileResponse:
-      type: object
-      properties:
-        totalPages:
-          type: integer
-          format: int32
-        totalElements:
-          type: integer
-          format: int64
-        pageable:
-          $ref: "#/components/schemas/PageableObject"
-        first:
-          type: boolean
-        last:
-          type: boolean
-        size:
-          type: integer
-          format: int32
         content:
           type: array
+          description: Элементы страницы
           items:
-            $ref: "#/components/schemas/AdminFileResponse"
-        number:
+            $ref: "#/components/schemas/AuditLogResponse"
+        page:
           type: integer
+          description: "Номер страницы, с 0"
           format: int32
-        sort:
-          $ref: "#/components/schemas/SortObject"
-        numberOfElements:
+          example: 0
+        size:
           type: integer
+          description: Размер страницы
           format: int32
-        empty:
-          type: boolean
+          example: 20
+        totalElements:
+          type: integer
+          description: Всего элементов
+          format: int64
+          example: 42
+        totalPages:
+          type: integer
+          description: Всего страниц
+          format: int32
+          example: 3
+      description: Страница результатов
   securitySchemes:
-    Bearer Authentication:
-      type: http
-      description: "JWT токен, полученный через POST /api/auth/login"
-      scheme: bearer
-      bearerFormat: JWT
+    Cookie Authentication:
+      type: apiKey
+      description: "JWT в HttpOnly cookie, браузер ставит после POST /api/v1/auth/login"
+      name: jwt_token
+      in: cookie

@@ -1,7 +1,6 @@
 package org.resume.s3filemanager.service.file;
 
 import com.github.javafaker.Faker;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,11 +16,8 @@ import org.resume.s3filemanager.exception.FileAccessDeniedException;
 import org.resume.s3filemanager.exception.FileUploadLimitException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
 import org.resume.s3filemanager.repository.UserRepository;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.context.SecurityContextImpl;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 
-import java.util.Collections;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,196 +36,156 @@ class FilePermissionServiceTest {
     @InjectMocks
     private FilePermissionService filePermissionService;
 
-    private String username;
     private User user;
+    private AuthenticatedUser authenticatedUser;
 
     @BeforeEach
     void setUp() {
-        username = FAKER.name().username();
-        user = new User();
-        user.setId(FAKER.number().randomNumber());
-        user.setUsername(username);
-        user.setRole(UserRole.USER);
+        user = buildUser(UserRole.USER);
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
-
-        var auth = new UsernamePasswordAuthenticationToken(username, null, Collections.emptyList());
-        SecurityContextHolder.setContext(new SecurityContextImpl(auth));
-    }
-
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
+        authenticatedUser = new AuthenticatedUser(user.getUsername(), UserRole.USER);
     }
 
     // checkUploadPermission
 
     /**
-     * Проверяет что пользователь со статусом NOT_UPLOADED получает разрешение
-     * на загрузку и возвращается корректный объект пользователя.
+     * Пользователь со статусом NOT_UPLOADED получает разрешение на загрузку.
      */
     @Test
     void shouldAllowUpload_whenStatusIsNotUploaded() {
-        user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
 
-        User result = filePermissionService.checkUploadPermission();
+        User result = filePermissionService.checkUploadPermission(authenticatedUser);
 
         assertThat(result).isEqualTo(user);
     }
 
     /**
-     * Проверяет что пользователь со статусом UNLIMITED может загружать файлы
-     * без каких-либо ограничений.
+     * Пользователь со статусом UNLIMITED загружает файлы без ограничений.
      */
     @Test
     void shouldAllowUpload_whenStatusIsUnlimited() {
         user.setUploadStatus(FileUploadStatus.UNLIMITED);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
 
-        User result = filePermissionService.checkUploadPermission();
+        User result = filePermissionService.checkUploadPermission(authenticatedUser);
 
         assertThat(result).isEqualTo(user);
     }
 
     /**
-     * Проверяет что пользователь со статусом FILE_UPLOADED не может загрузить
-     * повторный файл — выбрасывается FileUploadLimitException.
+     * Пользователь со статусом FILE_UPLOADED получает FileUploadLimitException.
      */
     @Test
     void shouldThrowFileUploadLimitException_whenStatusIsFileUploaded() {
         user.setUploadStatus(FileUploadStatus.FILE_UPLOADED);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> filePermissionService.checkUploadPermission())
+        assertThatThrownBy(() -> filePermissionService.checkUploadPermission(authenticatedUser))
                 .isInstanceOf(FileUploadLimitException.class);
     }
 
     /**
-     * Проверяет что при отсутствии пользователя в БД выбрасывается UserNotFoundException.
+     * Пользователя нет в БД: UserNotFoundException.
      */
     @Test
     void shouldThrowUserNotFoundException_whenUserNotFoundInDatabase() {
-        when(userRepository.findByUsername(username)).thenReturn(Optional.empty());
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> filePermissionService.checkUploadPermission())
+        assertThatThrownBy(() -> filePermissionService.checkUploadPermission(authenticatedUser))
                 .isInstanceOf(UserNotFoundException.class);
     }
 
     // checkDeletePermission
 
     /**
-     * Проверяет что владелец файла может удалить свой файл.
+     * Владелец может удалить свой файл без запроса в БД.
      */
     @Test
     void shouldAllowDelete_whenUserIsOwner() {
         FileMetadata file = buildFileMetadata(user);
 
-        filePermissionService.checkDeletePermission(user, file);
+        filePermissionService.checkDeletePermission(authenticatedUser, file);
 
-        verify(userRepository, never()).findByUsername(any());
+        verifyNoInteractions(userRepository);
     }
 
     /**
-     * Проверяет что администратор может удалить файл любого пользователя,
-     * не являясь его владельцем.
+     * Администратор может удалить чужой файл.
      */
     @Test
     void shouldAllowDelete_whenUserIsAdmin() {
-        User admin = new User();
-        admin.setId(FAKER.number().randomNumber());
-        admin.setRole(UserRole.ADMIN);
-
-        User otherUser = new User();
-        otherUser.setId(FAKER.number().randomNumber());
-
-        FileMetadata file = buildFileMetadata(otherUser);
+        AuthenticatedUser admin = new AuthenticatedUser(FAKER.name().username(), UserRole.ADMIN);
+        FileMetadata file = buildFileMetadata(buildUser(UserRole.USER));
 
         filePermissionService.checkDeletePermission(admin, file);
 
-        verify(userRepository, never()).findByUsername(any());
+        verifyNoInteractions(userRepository);
     }
 
     /**
-     * Проверяет что обычный пользователь не может удалить чужой файл —
-     * выбрасывается FileAccessDeniedException.
+     * Обычный пользователь получает FileAccessDeniedException при удалении чужого файла.
      */
     @Test
     void shouldThrowFileAccessDeniedException_whenUserTriesToDeleteOthersFile() {
-        User otherUser = new User();
-        otherUser.setId(FAKER.number().randomNumber());
-        user.setUsername(username);
-        user.setRole(UserRole.USER);
+        FileMetadata file = buildFileMetadata(buildUser(UserRole.USER));
 
-        FileMetadata file = buildFileMetadata(otherUser);
-
-        assertThatThrownBy(() -> filePermissionService.checkDeletePermission(user, file))
+        assertThatThrownBy(() -> filePermissionService.checkDeletePermission(authenticatedUser, file))
                 .isInstanceOf(FileAccessDeniedException.class);
     }
 
     /**
-     * Проверяет что администратор не получает исключение даже при попытке
-     * удалить собственный файл (базовый случай для ADMIN-роли).
+     * Администратор может удалить свой файл.
      */
     @Test
     void shouldAllowDelete_whenAdminDeletesOwnFile() {
-        User admin = new User();
-        admin.setId(FAKER.number().randomNumber());
-        admin.setRole(UserRole.ADMIN);
-
-        FileMetadata file = buildFileMetadata(admin);
+        User adminUser = buildUser(UserRole.ADMIN);
+        AuthenticatedUser admin = new AuthenticatedUser(adminUser.getUsername(), UserRole.ADMIN);
+        FileMetadata file = buildFileMetadata(adminUser);
 
         filePermissionService.checkDeletePermission(admin, file);
+
+        verifyNoInteractions(userRepository);
     }
 
-    // getCurrentUser
+    // markFileUploaded
 
     /**
-     * Проверяет что getCurrentUser корректно возвращает пользователя
-     * из SecurityContext по имени.
-     */
-    @Test
-    void shouldReturnCurrentUser_fromSecurityContext() {
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
-
-        User result = filePermissionService.getCurrentUser();
-
-        assertThat(result.getUsername()).isEqualTo(username);
-        verify(userRepository).findByUsername(username);
-    }
-
-    // markFileUploaded()
-
-    /**
-     * Проверяет что статус пользователя меняется с NOT_UPLOADED на FILE_UPLOADED
-     * и пользователь сохраняется в БД.
+     * Статус NOT_UPLOADED меняется на FILE_UPLOADED и пользователь сохраняется.
      */
     @Test
     void shouldMarkFileUploaded_whenStatusIsNotUploaded() {
-        user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        filePermissionService.markFileUploaded();
+        filePermissionService.markFileUploaded(user.getId());
 
         assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.FILE_UPLOADED);
         verify(userRepository).save(user);
     }
 
     /**
-     * Проверяет что пользователь со статусом UNLIMITED не изменяется
-     * и сохранение в БД не происходит.
+     * Статус UNLIMITED не меняется и сохранения нет.
      */
     @Test
     void shouldNotChangeStatus_whenStatusIsUnlimited() {
         user.setUploadStatus(FileUploadStatus.UNLIMITED);
-        when(userRepository.findByUsername(username)).thenReturn(Optional.of(user));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        filePermissionService.markFileUploaded();
+        filePermissionService.markFileUploaded(user.getId());
 
         assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.UNLIMITED);
         verify(userRepository, never()).save(any());
     }
 
     // === Helpers methods ===
+    private User buildUser(UserRole role) {
+        User owner = new User();
+        owner.setId(FAKER.number().randomNumber());
+        owner.setUsername(FAKER.name().username());
+        owner.setRole(role);
+        return owner;
+    }
+
     private FileMetadata buildFileMetadata(User owner) {
         return FileMetadata.builder()
                 .id(FAKER.number().randomNumber())

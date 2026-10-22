@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.resume.common.model.ScanStatus;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.dto.*;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserStatus;
@@ -16,7 +17,6 @@ import org.resume.s3filemanager.service.admin.AdminFileService;
 import org.resume.s3filemanager.service.admin.AdminUserService;
 import org.resume.s3filemanager.service.kafka.RetryDLTService;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.*;
  * Доступен только администраторам.
  */
 @RestController
-@RequestMapping("/api/admin")
+@RequestMapping(ApiPaths.ADMIN)
 @RequiredArgsConstructor
 @Tag(name = "Admin", description = "Администрирование пользователями, файлами и логами")
 public class AdminController {
@@ -41,16 +41,17 @@ public class AdminController {
     @Operation(summary = "Журнал аудита", description = "Возвращает логи с фильтрацией по пользователю, операции, статусу и дате")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Успешно"),
+            @ApiResponse(responseCode = "400", description = "Начало периода позже конца"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Недостаточно прав")
     })
     @Parameter(name = "page", description = "Номер страницы", example = "0")
     @Parameter(name = "size", description = "Размер страницы", example = "20")
-    @PostMapping("/audit-logs")
-    public Page<AuditLogResponse> getAuditLogs(
+    @GetMapping("/audit-logs")
+    public CommonResponse<PageResponse<AuditLogResponse>> getAuditLogs(
             @Valid @ParameterObject AuditLogFilter filter,
             @Parameter(hidden = true) Pageable pageable) {
-        return adminAuditService.getAuditLogs(filter, pageable);
+        return CommonResponse.success(PageResponse.from(adminAuditService.getAuditLogs(filter, pageable)));
     }
 
     @Operation(summary = "Список пользователей", description = "Возвращает всех пользователей с пагинацией")
@@ -62,8 +63,8 @@ public class AdminController {
     @Parameter(name = "page", description = "Номер страницы", example = "0")
     @Parameter(name = "size", description = "Размер страницы", example = "20")
     @GetMapping("/users")
-    public Page<UserDetailsResponse> getUsers(@Parameter(hidden = true) Pageable pageable) {
-        return adminUserService.getUsers(pageable);
+    public CommonResponse<PageResponse<UserDetailsResponse>> getUsers(@Parameter(hidden = true) Pageable pageable) {
+        return CommonResponse.success(PageResponse.from(adminUserService.getUsers(pageable)));
     }
 
     @Operation(summary = "Изменить статус пользователя", description = "Меняет статус (ACTIVE/BLOCKED). При блокировке инвалидирует токен")
@@ -117,10 +118,10 @@ public class AdminController {
     @Parameter(name = "page", description = "Номер страницы", example = "0")
     @Parameter(name = "size", description = "Размер страницы", example = "20")
     @GetMapping("/files/scan-status")
-    public Page<AdminFileResponse> getFilesByScanStatus(
+    public CommonResponse<PageResponse<AdminFileResponse>> getFilesByScanStatus(
             @Parameter(description = "Статус сканирования", example = "CLEAN") @RequestParam ScanStatus scanStatus,
             @Parameter(hidden = true) Pageable pageable) {
-        return adminFileService.findAllByScanStatus(scanStatus, pageable);
+        return CommonResponse.success(PageResponse.from(adminFileService.findAllByScanStatus(scanStatus, pageable)));
     }
 
     @Operation(summary = "Повторить обработку DLT", description = "Переотправляет все сообщения из Dead Letter Topic для файлов со статусом ERROR")

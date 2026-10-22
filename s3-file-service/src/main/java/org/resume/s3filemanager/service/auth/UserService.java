@@ -109,7 +109,7 @@ public class UserService {
     }
 
     public Page<User> findAll(Pageable pageable) {
-        return userRepository.findAll(pageable);
+        return userRepository.findAllByOrderByIdAsc(pageable);
     }
 
     public User findById(Long userId) {

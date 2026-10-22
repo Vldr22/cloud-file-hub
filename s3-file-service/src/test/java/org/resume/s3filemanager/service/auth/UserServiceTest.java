@@ -64,7 +64,7 @@ class UserServiceTest {
     }
 
     /**
-     * Создание пользователя — сохраняется с ролью USER и статусом NOT_UPLOADED.
+     * Создание пользователя: сохраняется с ролью USER и статусом NOT_UPLOADED.
      */
     @Test
     void shouldCreateUser_whenUsernameIsUnique() {
@@ -77,7 +77,7 @@ class UserServiceTest {
     }
 
     /**
-     * Создание пользователя с занятым именем — UserAlreadyExistsException.
+     * Создание пользователя с занятым именем: UserAlreadyExistsException.
      */
     @Test
     void shouldThrowUserAlreadyExistsException_whenUsernameIsTaken() {
@@ -90,7 +90,7 @@ class UserServiceTest {
     }
 
     /**
-     * Поиск по имени — возвращает пользователя.
+     * Поиск по имени: возвращает пользователя.
      */
     @Test
     void shouldReturnUser_whenUsernameExists() {
@@ -102,7 +102,7 @@ class UserServiceTest {
     }
 
     /**
-     * Поиск по имени — пользователь не найден, UserNotFoundException.
+     * Поиск по имени: пользователь не найден, UserNotFoundException.
      */
     @Test
     void shouldThrowUserNotFoundException_whenUsernameNotFound() {
@@ -113,7 +113,7 @@ class UserServiceTest {
     }
 
     /**
-     * Поиск для аутентификации — возвращает пользователя.
+     * Поиск для аутентификации: возвращает пользователя.
      */
     @Test
     void shouldReturnUser_whenUsernameExistsForAuth() {
@@ -125,7 +125,7 @@ class UserServiceTest {
     }
 
     /**
-     * Поиск для аутентификации — пользователь не найден, BadCredentialsException.
+     * Поиск для аутентификации: пользователь не найден, BadCredentialsException.
      */
     @Test
     void shouldThrowBadCredentialsException_whenUserNotFoundForAuth() {
@@ -136,7 +136,7 @@ class UserServiceTest {
     }
 
     /**
-     * Обновление статуса загрузки — статус изменяется и пользователь сохраняется.
+     * Обновление статуса загрузки: статус изменяется и пользователь сохраняется.
      */
     @Test
     void shouldUpdateUploadStatus_whenUserIsNotUnlimited() {
@@ -149,7 +149,7 @@ class UserServiceTest {
     }
 
     /**
-     * Обновление статуса для UNLIMITED пользователя — статус не меняется.
+     * Обновление статуса для UNLIMITED пользователя: статус не меняется.
      */
     @Test
     void shouldSkipStatusUpdate_whenUserIsUnlimited() {
@@ -162,22 +162,22 @@ class UserServiceTest {
     }
 
     /**
-     * Постраничный список пользователей — возвращает результат из репозитория.
+     * Постраничный список пользователей: возвращает результат из репозитория.
      */
     @Test
     void shouldReturnPage_whenFindAll() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<User> page = new PageImpl<>(List.of(user));
-        when(userRepository.findAll(pageable)).thenReturn(page);
+        when(userRepository.findAllByOrderByIdAsc(pageable)).thenReturn(page);
 
         Page<User> result = userService.findAll(pageable);
 
         assertThat(result.getContent()).hasSize(1);
-        verify(userRepository).findAll(pageable);
+        verify(userRepository).findAllByOrderByIdAsc(pageable);
     }
 
     /**
-     * Поиск по id — возвращает пользователя.
+     * Поиск по id: возвращает пользователя.
      */
     @Test
     void shouldReturnUser_whenIdExists() {
@@ -189,7 +189,7 @@ class UserServiceTest {
     }
 
     /**
-     * Поиск по id — пользователь не найден, UserNotFoundException.
+     * Поиск по id: пользователь не найден, UserNotFoundException.
      */
     @Test
     void shouldThrowUserNotFoundException_whenIdNotFound() {
@@ -200,7 +200,7 @@ class UserServiceTest {
     }
 
     /**
-     * Обновление UserStatus — статус изменяется и пользователь сохраняется.
+     * Обновление UserStatus: статус изменяется и пользователь сохраняется.
      */
     @Test
     void shouldUpdateUserStatus_whenCalled() {
@@ -211,7 +211,7 @@ class UserServiceTest {
     }
 
     /**
-     * Обновление FileUploadStatus — статус изменяется и пользователь сохраняется.
+     * Обновление FileUploadStatus: статус изменяется и пользователь сохраняется.
      */
     @Test
     void shouldUpdateFileUploadStatus_whenCalled() {
@@ -222,7 +222,7 @@ class UserServiceTest {
     }
 
     /**
-     * Удаление пользователя — репозиторий вызывает delete.
+     * Удаление пользователя: репозиторий вызывает delete.
      */
     @Test
     void shouldDeleteUser_whenCalled() {

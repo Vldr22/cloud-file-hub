@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 class FileMetadataServiceTest {
 
     private static final Faker FAKER = new Faker();
+    private static final String DETECTED_TYPE = "application/pdf";
 
     @Mock
     private FileMetadataRepository fileMetadataRepository;
@@ -77,38 +78,44 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Сохранение метаданных — объект строится с правильными полями и сохраняется в репозиторий.
+     * Сохранение метаданных: тип берётся от Tika, а не из Content-Type клиента.
      */
     @Test
-    void shouldSaveMetadata_whenValidFileProvided() {
-        when(fileMetadataRepository.save(any())).thenReturn(fileMetadata);
+    void shouldSaveMetadata_withDetectedContentType() {
+        MockMultipartFile spoofedFile = new MockMultipartFile(
+                "file",
+                FAKER.file().fileName(null, null, "pdf", null),
+                "text/html",
+                FAKER.lorem().characters(10).getBytes());
+        when(fileMetadataRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        FileMetadata result = fileMetadataService.saveDatabaseMetadata(multipartFile, uniqueName, fileHash, user);
+        FileMetadata result = fileMetadataService.saveDatabaseMetadata(
+                spoofedFile, uniqueName, fileHash, DETECTED_TYPE, user);
 
         assertThat(result.getUniqueName()).isEqualTo(uniqueName);
         assertThat(result.getFileHash()).isEqualTo(fileHash);
+        assertThat(result.getType()).isEqualTo(DETECTED_TYPE);
         assertThat(result.getScanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
-        verify(fileMetadataRepository).save(any());
     }
 
     /**
-     * Сохранение с outbox-событием — метаданные сохраняются, статус загрузки пользователя
-     * обновляется и создаётся событие на антивирусную проверку.
+     * Сохранение с outbox-событием: метаданные, статус загрузки пользователя и событие на проверку.
      */
     @Test
     void shouldSaveMarkUploadedAndCreateOutboxEvent_whenSaveFileWithOutboxEvent() {
         when(fileMetadataRepository.save(any())).thenReturn(fileMetadata);
 
-        FileMetadata result = fileMetadataService.saveFileWithOutboxEvent(multipartFile, uniqueName, fileHash, user);
+        FileMetadata result = fileMetadataService.saveFileWithOutboxEvent(
+                multipartFile, uniqueName, fileHash, DETECTED_TYPE, user);
 
         assertThat(result).isEqualTo(fileMetadata);
         verify(fileMetadataRepository).save(any());
-        verify(fileUploadPermissionService).markFileUploaded();
+        verify(fileUploadPermissionService).markFileUploaded(user.getId());
         verify(outboxService).saveFileUploadEvent(fileMetadata, user.getId());
     }
 
     /**
-     * Удаление файла — метаданные удаляются и статус пользователя сбрасывается на NOT_UPLOADED.
+     * Удаление файла: метаданные удаляются, статус пользователя сбрасывается на NOT_UPLOADED.
      */
     @Test
     void shouldDeleteAndResetUserStatus_whenDeletingFile() {
@@ -121,7 +128,7 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Файл не найден при удалении — FileNotFoundException.
+     * Файл не найден при удалении: FileNotFoundException.
      */
     @Test
     void shouldThrowFileNotFoundException_whenDeletingNonExistentFile() {
@@ -132,7 +139,7 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Обновление статуса сканирования — находит файл и сохраняет с новым статусом.
+     * Обновление статуса сканирования: файл сохраняется с новым статусом.
      */
     @Test
     void shouldUpdateScanStatus_whenFileExists() {
@@ -145,7 +152,7 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Файл не найден — FileNotFoundException.
+     * Файл не найден: FileNotFoundException.
      */
     @Test
     void shouldThrowFileNotFoundException_whenFileNotFound() {

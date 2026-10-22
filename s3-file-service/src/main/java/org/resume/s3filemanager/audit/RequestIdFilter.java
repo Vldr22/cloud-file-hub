@@ -23,7 +23,7 @@ import java.util.UUID;
  * Добавляет в MDC:
  * <ul>
  *   <li>requestId - уникальный идентификатор запроса для трейсинга</li>
- *   <li>Username - имя аутентифицированного пользователя или "anonymous"</li>
+ *   <li>Username - "anonymous", для аутентифицированного запроса имя ставит JwtTokenFilter</li>
  *   <li>Ip - IP адрес клиента</li>
  * </ul>
  * Эти значения автоматически включаются во все логи в рамках запроса.
@@ -39,11 +39,10 @@ public class RequestIdFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
             String requestId = UUID.randomUUID().toString();
-            String username = MySecurityUtils.getCurrentUsername();
             String ip = MySecurityUtils.extractClientIp(request);
 
             MDC.put(MdcConstants.REQUEST_ID, requestId);
-            MDC.put(MdcConstants.USERNAME, username != null ? username : SecurityConstants.ANONYMOUS);
+            MDC.put(MdcConstants.USERNAME, SecurityConstants.ANONYMOUS);
             MDC.put(MdcConstants.IP_ADDRESS, ip);
 
             log.debug("Request started: {} {}", request.getMethod(), request.getRequestURI());

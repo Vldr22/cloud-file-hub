@@ -15,18 +15,16 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.repository.AuditLogRepository;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.repository.UserRepository;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.BucketAlreadyExistsException;
 import software.amazon.awssdk.services.s3.model.BucketAlreadyOwnedByYouException;
 import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 
 import java.io.IOException;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +53,7 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
     private S3Client yandexS3Client;
 
     private User user;
+    private AuthenticatedUser authenticatedUser;
     private MockMultipartFile multipartFile;
 
     @BeforeEach
@@ -70,10 +69,7 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
         user.setUploadStatus(FileUploadStatus.UNLIMITED);
         user.setStatus(UserStatus.ACTIVE);
         user = userRepository.save(user);
-
-        SecurityContextHolder.getContext().setAuthentication(
-                new UsernamePasswordAuthenticationToken(user.getUsername(), null, List.of())
-        );
+        authenticatedUser = new AuthenticatedUser(user.getUsername(), user.getRole());
 
         MDC.put(MdcConstants.REQUEST_ID, UUID.randomUUID().toString());
         MDC.put(MdcConstants.USERNAME, user.getUsername());
@@ -98,16 +94,15 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        SecurityContextHolder.clearContext();
         MDC.clear();
     }
 
     /**
-     * Загрузка файла — файл сохраняется в S3 и метаданные в БД.
+     * Загрузка файла: файл в S3, метаданные в БД.
      */
     @Test
     void shouldUploadFile_andSaveMetadata() {
-        fileFacadeService.uploadFile(multipartFile);
+        fileFacadeService.uploadFile(multipartFile, authenticatedUser);
 
         assertThat(fileMetadataRepository.findAll()).hasSize(1);
 
@@ -119,11 +114,11 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
     }
 
     /**
-     * Скачивание файла — возвращает правильное содержимое.
+     * Скачивание файла возвращает правильное содержимое.
      */
     @Test
     void shouldDownloadFile_withCorrectContent() throws IOException {
-        fileFacadeService.uploadFile(multipartFile);
+        fileFacadeService.uploadFile(multipartFile, authenticatedUser);
 
         String uniqueName = fileMetadataRepository.findAll().getFirst().getUniqueName();
         markAsClean(uniqueName);
@@ -134,37 +129,37 @@ class FileFacadeServiceIT extends BaseIntegrationTest {
     }
 
     /**
-     * Удаление файла — метаданные удаляются из БД.
+     * Удаление файла убирает метаданные из БД.
      */
     @Test
     void shouldDeleteFile_andRemoveMetadata() {
-        fileFacadeService.uploadFile(multipartFile);
+        fileFacadeService.uploadFile(multipartFile, authenticatedUser);
 
         String uniqueName = fileMetadataRepository.findAll().getFirst().getUniqueName();
-        fileFacadeService.deleteFile(uniqueName);
+        fileFacadeService.deleteFile(uniqueName, authenticatedUser);
 
         assertThat(fileMetadataRepository.findByUniqueName(uniqueName)).isEmpty();
     }
 
     /**
-     * Аудит — после upload/download/delete в БД появляются записи аудита.
+     * Аудит: после upload, download и delete в БД появляются записи.
      */
     @Test
     void shouldCreateAuditLogs_forUploadDownloadDelete() {
-        fileFacadeService.uploadFile(multipartFile);
+        fileFacadeService.uploadFile(multipartFile, authenticatedUser);
 
         String uniqueName = fileMetadataRepository.findAll().getFirst().getUniqueName();
         markAsClean(uniqueName);
 
         fileFacadeService.downloadFile(uniqueName);
-        fileFacadeService.deleteFile(uniqueName);
+        fileFacadeService.deleteFile(uniqueName, authenticatedUser);
 
         await().atMost(5, TimeUnit.SECONDS).untilAsserted(() ->
                 assertThat(auditLogRepository.count()).isEqualTo(3));
     }
 
     /**
-     * Имитирует успешную антивирусную проверку - в тестах antivirus-service не запущен.
+     * Имитирует успешную антивирусную проверку: в тестах antivirus-service не запущен.
      */
     private void markAsClean(String uniqueName) {
         FileMetadata file = fileMetadataRepository.findByUniqueName(uniqueName).orElseThrow();
