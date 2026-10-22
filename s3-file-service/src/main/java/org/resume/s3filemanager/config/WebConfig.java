@@ -13,12 +13,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.util.List;
 
 /**
- * Конфигурация Spring MVC для пагинации.
- * <p>
- * Настраивает {@link PageableHandlerMethodArgumentResolver} с параметрами
- * пагинации по умолчанию из конфигурационных properties.
- *
- * @see PageableProperties
+ * Пагинация: размер страницы из properties, параметр sort от клиента игнорируется.
  */
 @Configuration
 @RequiredArgsConstructor
@@ -31,7 +26,7 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         PageableHandlerMethodArgumentResolver resolver =
-                new PageableHandlerMethodArgumentResolver();
+                new PageableHandlerMethodArgumentResolver(new UnsortedSortArgumentResolver());
 
         resolver.setFallbackPageable(PageRequest.of(0, pageableProperties.getDefaultPageSize()));
         resolver.setMaxPageSize(pageableProperties.getMaxPageSize());

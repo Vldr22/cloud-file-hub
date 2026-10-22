@@ -9,6 +9,7 @@ import org.resume.s3filemanager.mapper.AuditLogMapper;
 import org.resume.s3filemanager.repository.AuditLogRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.querydsl.QPageRequest;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,16 +23,14 @@ public class AdminAuditService {
     private final AuditLogMapper auditLogMapper;
 
     /**
-     * Возвращает отфильтрованный список записей аудита.
-     *
-     * @param filter фильтры (username, operation, status, from, to)
-     * @param pageable параметры пагинации
-     * @return страница с записями аудита
+     * Возвращает записи аудита по фильтру, новые сверху.
      */
     public Page<AuditLogResponse> getAuditLogs(AuditLogFilter filter, Pageable pageable) {
         BooleanBuilder builder = buildFilter(filter);
+        Pageable newestFirst = QPageRequest.of(
+                pageable.getPageNumber(), pageable.getPageSize(), QAuditLog.auditLog.timestamp.desc());
 
-        return auditLogRepository.findAll(builder, pageable)
+        return auditLogRepository.findAll(builder, newestFirst)
                 .map(auditLogMapper::toAuditLogResponse);
     }
 
