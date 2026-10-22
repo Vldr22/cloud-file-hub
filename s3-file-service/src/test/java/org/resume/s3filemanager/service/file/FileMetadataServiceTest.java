@@ -30,6 +30,7 @@ import static org.mockito.Mockito.*;
 class FileMetadataServiceTest {
 
     private static final Faker FAKER = new Faker();
+    private static final String DETECTED_TYPE = "application/pdf";
 
     @Mock
     private FileMetadataRepository fileMetadataRepository;
@@ -77,18 +78,24 @@ class FileMetadataServiceTest {
     }
 
     /**
-     * Сохранение метаданных: объект строится с правильными полями и сохраняется в репозиторий.
+     * Сохранение метаданных: тип берётся от Tika, а не из Content-Type клиента.
      */
     @Test
-    void shouldSaveMetadata_whenValidFileProvided() {
-        when(fileMetadataRepository.save(any())).thenReturn(fileMetadata);
+    void shouldSaveMetadata_withDetectedContentType() {
+        MockMultipartFile spoofedFile = new MockMultipartFile(
+                "file",
+                FAKER.file().fileName(null, null, "pdf", null),
+                "text/html",
+                FAKER.lorem().characters(10).getBytes());
+        when(fileMetadataRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        FileMetadata result = fileMetadataService.saveDatabaseMetadata(multipartFile, uniqueName, fileHash, user);
+        FileMetadata result = fileMetadataService.saveDatabaseMetadata(
+                spoofedFile, uniqueName, fileHash, DETECTED_TYPE, user);
 
         assertThat(result.getUniqueName()).isEqualTo(uniqueName);
         assertThat(result.getFileHash()).isEqualTo(fileHash);
+        assertThat(result.getType()).isEqualTo(DETECTED_TYPE);
         assertThat(result.getScanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
-        verify(fileMetadataRepository).save(any());
     }
 
     /**
@@ -98,7 +105,8 @@ class FileMetadataServiceTest {
     void shouldSaveMarkUploadedAndCreateOutboxEvent_whenSaveFileWithOutboxEvent() {
         when(fileMetadataRepository.save(any())).thenReturn(fileMetadata);
 
-        FileMetadata result = fileMetadataService.saveFileWithOutboxEvent(multipartFile, uniqueName, fileHash, user);
+        FileMetadata result = fileMetadataService.saveFileWithOutboxEvent(
+                multipartFile, uniqueName, fileHash, DETECTED_TYPE, user);
 
         assertThat(result).isEqualTo(fileMetadata);
         verify(fileMetadataRepository).save(any());

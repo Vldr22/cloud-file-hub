@@ -32,21 +32,16 @@ public class FileMetadataService {
     private final OutboxService outboxService;
 
     /**
-     * Сохраняет метаданные файла в базу данных с привязкой к пользователю.
-     * <p>
-     * Обновляет статус загрузки пользователя на FILE_UPLOADED.
+     * Сохраняет метаданные файла со статусом PENDING_SCAN.
      *
-     * @param file загруженный файл
-     * @param uniqueFileName сгенерированное уникальное имя файла (на основе UUID)
-     * @param fileHash MD5 хеш содержимого файла
-     * @param user пользователь, загрузивший файл
+     * @param contentType тип файла, определённый Tika по содержимому
      */
-    public FileMetadata saveDatabaseMetadata(MultipartFile file, String uniqueFileName,
-                                     String fileHash, User user) {
+    public FileMetadata saveDatabaseMetadata(MultipartFile file, String uniqueFileName, String fileHash,
+                                             String contentType, User user) {
         FileMetadata metadata = FileMetadata.builder()
                 .uniqueName(uniqueFileName)
                 .originalName(file.getOriginalFilename())
-                .type(file.getContentType())
+                .type(contentType)
                 .size(file.getSize())
                 .fileHash(fileHash)
                 .scanStatus(ScanStatus.PENDING_SCAN)
@@ -74,8 +69,9 @@ public class FileMetadataService {
      * в одной транзакции: файл не может оказаться в БД без события на антивирусную проверку.
      */
     @Transactional
-    public FileMetadata saveFileWithOutboxEvent(MultipartFile file, String uniqueFileName, String fileHash, User user) {
-        FileMetadata saved = saveDatabaseMetadata(file, uniqueFileName, fileHash, user);
+    public FileMetadata saveFileWithOutboxEvent(MultipartFile file, String uniqueFileName, String fileHash,
+                                                String contentType, User user) {
+        FileMetadata saved = saveDatabaseMetadata(file, uniqueFileName, fileHash, contentType, user);
         fileUploadPermissionService.markFileUploaded(user.getId());
         outboxService.saveFileUploadEvent(saved, user.getId());
         return saved;

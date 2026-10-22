@@ -18,6 +18,7 @@ import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
 import org.resume.s3filemanager.validation.FileValidator;
+import org.resume.s3filemanager.validation.TikaFileDetector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -41,6 +42,7 @@ public class FileFacadeService {
     private final FileMetadataService fileMetadataService;
     private final FilePermissionService filePermissionService;
     private final FileValidator fileValidator;
+    private final TikaFileDetector tikaFileDetector;
     private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
     private final S3KeyGenerator s3KeyGenerator;
     private final FileMapper fileMapper;
@@ -50,7 +52,7 @@ public class FileFacadeService {
      *
      * @return файл со статусом PENDING_SCAN
      * @throws FileUploadLimitException если лимит загрузки исчерпан
-     * @throws DuplicateFileException если такой файл уже загружен пользователем
+     * @throws DuplicateFileException   если такой файл уже загружен пользователем
      */
     @Auditable(operation = AuditOperation.FILE_UPLOAD, resourceType = ResourceType.FILE)
     public FileResponse uploadFile(MultipartFile file, AuthenticatedUser authenticatedUser) {
@@ -90,7 +92,7 @@ public class FileFacadeService {
     /**
      * Скачивает файл, прошедший антивирусную проверку.
      *
-     * @throws FileNotFoundException если файл не найден
+     * @throws FileNotFoundException     если файл не найден
      * @throws FileNotAvailableException если статус проверки не CLEAN
      */
     @Auditable(operation = AuditOperation.FILE_DOWNLOAD, resourceType = ResourceType.FILE)
@@ -120,7 +122,7 @@ public class FileFacadeService {
      * Удаляет файл из S3 и БД и сбрасывает лимит загрузки владельца.
      * Пользователь удаляет только свои файлы, админ любые.
      *
-     * @throws FileNotFoundException если файл не найден
+     * @throws FileNotFoundException     если файл не найден
      * @throws FileAccessDeniedException если пользователь удаляет чужой файл
      */
     @Auditable(operation = AuditOperation.FILE_DELETE, resourceType = ResourceType.FILE)
@@ -135,18 +137,20 @@ public class FileFacadeService {
     }
 
     /**
-     * Загрузка без проверки прав: при ошибке сохранения в БД файл удаляется из S3.
+     * Загрузка без проверки прав: тип файла берётся от Tika, при ошибке сохранения в БД файл удаляется из S3.
      */
     private FileMetadata uploadFileInternal(MultipartFile file, User user) {
         String uniqueFileName = s3KeyGenerator.generate(file.getOriginalFilename());
         byte[] fileBytes = readFileBytes(file);
         String fileHash = fileHashService.calculateMD5(fileBytes);
+        String contentType = tikaFileDetector.detectContentType(fileBytes, file.getOriginalFilename());
 
         fileHashService.checkDuplicateInDatabase(fileHash, user.getId());
-        fileStorageService.uploadFileYandexS3(uniqueFileName, fileBytes, file.getContentType());
+        fileStorageService.uploadFileYandexS3(uniqueFileName, fileBytes, contentType);
 
         try {
-            FileMetadata saved = fileMetadataService.saveFileWithOutboxEvent(file, uniqueFileName, fileHash, user);
+            FileMetadata saved = fileMetadataService.saveFileWithOutboxEvent(
+                    file, uniqueFileName, fileHash, contentType, user);
             log.info("File uploaded successfully: {}", uniqueFileName);
 
             return saved;
