@@ -24,7 +24,7 @@
 {
   "data": {},
   "status": "SUCCESS",
-  "timestamp": "2026-03-11T03:41:17.639342344"
+  "timestamp": "2026-10-22T10:15:30.639Z"
 }
 ```
 
@@ -38,7 +38,7 @@
     "status": 404,
     "detail": "File not found"
   },
-  "timestamp": "2026-03-11T03:41:17.639342344"
+  "timestamp": "2026-10-22T10:15:30.639Z"
 }
 ```
 

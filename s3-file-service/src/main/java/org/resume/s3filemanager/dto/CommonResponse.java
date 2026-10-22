@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.springframework.http.ProblemDetail;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "Общий формат ответа API")
@@ -20,15 +20,16 @@ public record CommonResponse<T>(
         @Schema(description = "Детали ошибки (только при ERROR)")
         ProblemDetail problemDetail,
 
-        @Schema(description = "Время ответа", example = "2026-03-11T03:41:17.639342344")
-        LocalDateTime timestamp) {
+        @Schema(description = "Время ответа", example = "2026-10-22T10:15:30.639Z")
+        Instant timestamp
+) {
 
     public static <T> CommonResponse<T> success(T data) {
         return new CommonResponse<>(
                 data,
                 CommonResponseStatus.SUCCESS,
                 null,
-                LocalDateTime.now());
+                Instant.now());
     }
 
     public static <T> CommonResponse<T> error(ProblemDetail problemDetail) {
@@ -36,7 +37,7 @@ public record CommonResponse<T>(
                 null,
                 CommonResponseStatus.ERROR,
                 problemDetail,
-                LocalDateTime.now());
+                Instant.now());
     }
 
 }
