@@ -53,7 +53,7 @@ class FilePaginationServiceTest {
                 .build();
 
         Pageable pageable = PageRequest.of(0, 10);
-        when(fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable))
+        when(fileMetadataRepository.findByScanStatusOrderByUploadedAtDesc(ScanStatus.CLEAN, pageable))
                 .thenReturn(new PageImpl<>(List.of(file)));
 
         Page<FileResponse> result = filePaginationService.paginate(pageable);
@@ -63,7 +63,7 @@ class FilePaginationServiceTest {
         assertThat(result.getContent().getFirst().uniqueName()).isEqualTo(file.getUniqueName());
         assertThat(result.getContent().getFirst().fileSize()).isEqualTo(SIZE_BYTES);
 
-        verify(fileMetadataRepository).findByScanStatus(ScanStatus.CLEAN, pageable);
+        verify(fileMetadataRepository).findByScanStatusOrderByUploadedAtDesc(ScanStatus.CLEAN, pageable);
     }
 
     /**
@@ -72,7 +72,7 @@ class FilePaginationServiceTest {
     @Test
     void shouldReturnEmptyPage_whenNoFilesExist() {
         Pageable pageable = PageRequest.of(0, 10);
-        when(fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable))
+        when(fileMetadataRepository.findByScanStatusOrderByUploadedAtDesc(ScanStatus.CLEAN, pageable))
                 .thenReturn(Page.empty());
 
         Page<FileResponse> result = filePaginationService.paginate(pageable);
@@ -94,7 +94,7 @@ class FilePaginationServiceTest {
                 .build();
 
         Pageable pageable = PageRequest.of(0, 10);
-        when(fileMetadataRepository.findByUserUsername(username, pageable))
+        when(fileMetadataRepository.findByUserUsernameOrderByUploadedAtDesc(username, pageable))
                 .thenReturn(new PageImpl<>(List.of(file)));
 
         Page<FileResponse> result = filePaginationService.findUserFiles(username, pageable);

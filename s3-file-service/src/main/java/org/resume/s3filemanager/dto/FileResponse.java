@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import org.resume.common.model.ScanStatus;
 
+import java.time.Instant;
+
 @Builder
 @Schema(description = "Информация о файле")
 public record FileResponse(
@@ -17,5 +19,8 @@ public record FileResponse(
         long fileSize,
 
         @Schema(description = "Статус антивирусной проверки", example = "CLEAN")
-        ScanStatus scanStatus) {
+        ScanStatus scanStatus,
+
+        @Schema(description = "Время загрузки", example = "2026-10-22T10:15:30Z")
+        Instant uploadedAt) {
 }

@@ -26,7 +26,7 @@ public class FilePaginationService {
      * @return страница с информацией о файлах
      */
     public Page<FileResponse> paginate(Pageable pageable) {
-        return fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable)
+        return fileMetadataRepository.findByScanStatusOrderByUploadedAtDesc(ScanStatus.CLEAN, pageable)
                 .map(fileMapper::toFileResponse);
     }
 
@@ -38,7 +38,7 @@ public class FilePaginationService {
      * @return страница с файлами пользователя
      */
     public Page<FileResponse> findUserFiles(String username, Pageable pageable) {
-        return fileMetadataRepository.findByUserUsername(username, pageable)
+        return fileMetadataRepository.findByUserUsernameOrderByUploadedAtDesc(username, pageable)
                 .map(fileMapper::toFileResponse);
     }
 }
