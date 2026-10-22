@@ -7,7 +7,8 @@ import org.resume.s3filemanager.audit.AuditOperation;
 import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
-import org.resume.s3filemanager.dto.AuthRequest;
+import org.resume.s3filemanager.dto.LoginRequest;
+import org.resume.s3filemanager.dto.RegisterRequest;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.UserStatus;
@@ -51,7 +52,7 @@ public class AuthService {
      * @throws UserBlockedException если пользователь заблокирован
      * @throws BadCredentialsException если учетные данные неверны
      */
-    public UserDetailsResponse login(AuthRequest request, HttpServletResponse response) {
+    public UserDetailsResponse login(LoginRequest request, HttpServletResponse response) {
         User user = verifyCredentials(request.username(), request.password());
 
         String token = jwtTokenService.generateToken(user.getUsername(), user.getRole());
@@ -84,7 +85,7 @@ public class AuthService {
      * @throws UserAlreadyExistsException если пользователь с таким именем уже существует
      */
     @Auditable(operation = AuditOperation.REGISTER, resourceType = ResourceType.USER)
-    public void register(AuthRequest request) {
+    public void register(RegisterRequest request) {
         userService.createUser(request.username(), request.password());
         log.info("User registered successfully: {}", request.username());
     }

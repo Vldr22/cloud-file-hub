@@ -7,7 +7,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.resume.s3filemanager.BaseIntegrationTest;
-import org.resume.s3filemanager.dto.AuthRequest;
+import org.resume.s3filemanager.dto.LoginRequest;
+import org.resume.s3filemanager.dto.RegisterRequest;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
@@ -70,7 +71,7 @@ class AuthServiceIT extends BaseIntegrationTest {
      */
     @Test
     void shouldRegister_andPersistUserInDatabase() {
-        AuthRequest request = new AuthRequest(username, password);
+        RegisterRequest request = new RegisterRequest(username, password);
 
         authService.register(request);
 
@@ -88,7 +89,7 @@ class AuthServiceIT extends BaseIntegrationTest {
      */
     @Test
     void shouldThrowUserAlreadyExistsException_whenUsernameIsTaken() {
-        AuthRequest request = new AuthRequest(username, password);
+        RegisterRequest request = new RegisterRequest(username, password);
         authService.register(request);
 
         assertThatThrownBy(() -> authService.register(request))
@@ -104,7 +105,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldLogin_andSaveTokenInRedis() {
         createActiveUser();
-        AuthRequest request = new AuthRequest(username, password);
+        LoginRequest request = new LoginRequest(username, password);
 
         UserDetailsResponse loginResponse = authService.login(request, response);
         String token = captureCookieToken(response);
@@ -121,7 +122,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldThrowUserBlockedException_whenUserIsBlocked() {
         createBlockedUser();
-        AuthRequest request = new AuthRequest(username, password);
+        LoginRequest request = new LoginRequest(username, password);
 
         assertThatThrownBy(() -> authService.login(request, response))
                 .isInstanceOf(UserBlockedException.class);
@@ -135,7 +136,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldThrowBadCredentialsException_whenPasswordIsWrong() {
         createActiveUser();
-        AuthRequest request = new AuthRequest(username, "wrong-password");
+        LoginRequest request = new LoginRequest(username, "wrong-password");
 
         assertThatThrownBy(() -> authService.login(request, response))
                 .isInstanceOf(BadCredentialsException.class);
@@ -150,7 +151,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldLogout_andRemoveTokenFromRedis() {
         createActiveUser();
-        authService.login(new AuthRequest(username, password), response);
+        authService.login(new LoginRequest(username, password), response);
         String token = captureCookieToken(response);
 
         authService.logout(new AuthenticatedUser(username, UserRole.USER), response);
@@ -166,7 +167,7 @@ class AuthServiceIT extends BaseIntegrationTest {
     @Test
     void shouldIssueNewToken_afterLogoutAndLoginAgain() {
         createActiveUser();
-        AuthRequest request = new AuthRequest(username, password);
+        LoginRequest request = new LoginRequest(username, password);
 
         authService.login(request, response);
         String firstToken = captureCookieToken(response);

@@ -10,7 +10,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.resume.s3filemanager.dto.AuthRequest;
+import org.resume.s3filemanager.dto.LoginRequest;
+import org.resume.s3filemanager.dto.RegisterRequest;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
@@ -63,7 +64,8 @@ class AuthServiceTest {
     private AuthService authService;
 
     private User user;
-    private AuthRequest authRequest;
+    private LoginRequest loginRequest;
+    private RegisterRequest registerRequest;
     private String token;
 
     @BeforeEach
@@ -80,7 +82,8 @@ class AuthServiceTest {
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
         user.setStatus(UserStatus.ACTIVE);
 
-        authRequest = new AuthRequest(username, password);
+        loginRequest = new LoginRequest(username, password);
+        registerRequest = new RegisterRequest(username, password);
     }
 
     /**
@@ -88,12 +91,12 @@ class AuthServiceTest {
      */
     @Test
     void shouldLogin_whenCredentialsAreValid() {
-        when(userService.findByUsernameForAuth(authRequest.username())).thenReturn(user);
-        when(passwordEncoder.matches(authRequest.password(), user.getPassword())).thenReturn(true);
+        when(userService.findByUsernameForAuth(loginRequest.username())).thenReturn(user);
+        when(passwordEncoder.matches(loginRequest.password(), user.getPassword())).thenReturn(true);
         when(jwtTokenService.generateToken(user.getUsername(), user.getRole())).thenReturn(token);
         when(jwtTokenService.getExpirationSeconds()).thenReturn(3600L);
 
-        UserDetailsResponse response = authService.login(authRequest, httpServletResponse);
+        UserDetailsResponse response = authService.login(loginRequest, httpServletResponse);
 
         assertThat(response.username()).isEqualTo(user.getUsername());
         assertThat(response.role()).isEqualTo(UserRole.USER);
@@ -121,10 +124,10 @@ class AuthServiceTest {
     @Test
     void shouldThrowUserBlockedException_whenUserIsBlocked() {
         user.setStatus(UserStatus.BLOCKED);
-        when(userService.findByUsernameForAuth(authRequest.username())).thenReturn(user);
-        when(passwordEncoder.matches(authRequest.password(), user.getPassword())).thenReturn(true);
+        when(userService.findByUsernameForAuth(loginRequest.username())).thenReturn(user);
+        when(passwordEncoder.matches(loginRequest.password(), user.getPassword())).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.login(authRequest, httpServletResponse))
+        assertThatThrownBy(() -> authService.login(loginRequest, httpServletResponse))
                 .isInstanceOf(UserBlockedException.class);
 
         verifyNoInteractions(jwtTokenService, jwtWhitelistService, jwtCookieService);
@@ -135,10 +138,10 @@ class AuthServiceTest {
      */
     @Test
     void shouldThrowBadCredentialsException_whenPasswordIsWrong() {
-        when(userService.findByUsernameForAuth(authRequest.username())).thenReturn(user);
-        when(passwordEncoder.matches(authRequest.password(), user.getPassword())).thenReturn(false);
+        when(userService.findByUsernameForAuth(loginRequest.username())).thenReturn(user);
+        when(passwordEncoder.matches(loginRequest.password(), user.getPassword())).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(authRequest, httpServletResponse))
+        assertThatThrownBy(() -> authService.login(loginRequest, httpServletResponse))
                 .isInstanceOf(BadCredentialsException.class);
 
         verifyNoInteractions(jwtTokenService, jwtWhitelistService, jwtCookieService);
@@ -149,9 +152,9 @@ class AuthServiceTest {
      */
     @Test
     void shouldRegister_whenUsernameIsUnique() {
-        authService.register(authRequest);
+        authService.register(registerRequest);
 
-        verify(userService).createUser(authRequest.username(), authRequest.password());
+        verify(userService).createUser(registerRequest.username(), registerRequest.password());
     }
 
     /**
@@ -161,7 +164,7 @@ class AuthServiceTest {
     void shouldThrowUserAlreadyExistsException_whenUsernameIsTaken() {
         doThrow(new UserAlreadyExistsException()).when(userService).createUser(anyString(), anyString());
 
-        assertThatThrownBy(() -> authService.register(authRequest))
+        assertThatThrownBy(() -> authService.register(registerRequest))
                 .isInstanceOf(UserAlreadyExistsException.class);
     }
 }

@@ -11,8 +11,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.constant.SuccessMessages;
-import org.resume.s3filemanager.dto.AuthRequest;
 import org.resume.s3filemanager.dto.CommonResponse;
+import org.resume.s3filemanager.dto.LoginRequest;
+import org.resume.s3filemanager.dto.RegisterRequest;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.auth.AuthService;
@@ -44,7 +45,7 @@ public class AuthController {
     })
     @SecurityRequirements
     @PostMapping("/login")
-    public CommonResponse<UserDetailsResponse> login(@Valid @RequestBody AuthRequest request, HttpServletResponse response) {
+    public CommonResponse<UserDetailsResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         return CommonResponse.success(authService.login(request, response));
     }
 
@@ -57,7 +58,7 @@ public class AuthController {
     @SecurityRequirements
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<String> register(@Valid @RequestBody AuthRequest request) {
+    public CommonResponse<String> register(@Valid @RequestBody RegisterRequest request) {
         authService.register(request);
         return CommonResponse.success(SuccessMessages.REGISTRATION_SUCCESS);
     }

@@ -10,7 +10,9 @@ public class ValidationMessages {
 
     // Auth
     public static final String USERNAME_SIZE = "Username must be between 3 and 50 characters";
-    public static final String PASSWORD_SIZE = "Password must be between 3 and 50 characters";
+    public static final String PASSWORD_SIZE = "Password must be between 8 and 50 characters";
+    public static final String USERNAME_TOO_LONG = "Username must be at most 50 characters";
+    public static final String PASSWORD_TOO_LONG = "Password must be at most 50 characters";
     public static final String FIELD_REQUIRED = "This field is required";
 
     // File validation
