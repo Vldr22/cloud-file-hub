@@ -108,7 +108,10 @@ jobs:
             # Deploy
             docker-compose pull s3-file-service antivirus-service
             docker-compose up -d --remove-orphans
-            
+
+            # Compose не пересоздаёт nginx при изменении nginx.conf - перезапуск подхватывает новый конфиг
+            docker-compose restart nginx
+
             # Чистим неиспользуемые образы
             docker image prune -f
 
@@ -125,7 +128,7 @@ jobs:
             set -e
             MAX_RETRIES=30
             RETRY_INTERVAL=15
-            URL="https://cloudfilehub.duckdns.org/api/home"
+            URL="https://cloudfilehub.duckdns.org/api/v1/home"
 
             for i in $(seq 1 $MAX_RETRIES); do
               echo "Health check attempt $i/$MAX_RETRIES..."

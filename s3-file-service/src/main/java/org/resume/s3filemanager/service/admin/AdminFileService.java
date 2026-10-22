@@ -7,6 +7,7 @@ import org.resume.s3filemanager.dto.FileStatsResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.exception.FileNotFoundException;
 import org.resume.s3filemanager.exception.InvalidScanStatusException;
+import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.service.file.YandexStorageService;
 import org.resume.s3filemanager.service.kafka.OutboxService;
@@ -16,8 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-
-import static org.resume.s3filemanager.service.file.FilePaginationService.convertToMB;
 
 /**
  * Сервис административных операций с файлами.
@@ -32,10 +31,11 @@ public class AdminFileService {
     private final FileMetadataRepository fileMetadataRepository;
     private final OutboxService outboxService;
     private final YandexStorageService yandexStorageService;
+    private final FileMapper fileMapper;
 
     public Page<AdminFileResponse> findAllByScanStatus(ScanStatus scanStatus, Pageable pageable) {
         return fileMetadataRepository.findByScanStatusWithUser(scanStatus, pageable)
-                .map(this::toAdminFileResponse);
+                .map(fileMapper::toAdminFileResponse);
     }
 
     /**
@@ -58,7 +58,7 @@ public class AdminFileService {
 
         outboxService.saveFileUploadEvent(file, file.getUser().getId());
 
-        return toAdminFileResponse(file);
+        return fileMapper.toAdminFileResponse(file);
     }
 
     /**
@@ -94,17 +94,5 @@ public class AdminFileService {
 
         fileMetadataRepository.deleteAll(files);
         return files.size();
-    }
-
-    private AdminFileResponse toAdminFileResponse(FileMetadata fileMetadata) {
-            return AdminFileResponse.builder()
-                    .id(fileMetadata.getId())
-                    .fileName(fileMetadata.getOriginalName())
-                    .uniqueName(fileMetadata.getUniqueName())
-                    .type(fileMetadata.getType())
-                    .scanStatus(fileMetadata.getScanStatus())
-                    .fileSize(convertToMB(fileMetadata.getSize()))
-                    .uploadedUserName(fileMetadata.getUser().getUsername())
-                    .build();
     }
 }

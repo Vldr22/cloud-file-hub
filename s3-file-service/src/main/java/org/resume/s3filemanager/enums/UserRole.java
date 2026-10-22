@@ -9,4 +9,8 @@ public enum UserRole {
     public String getAuthority() {
         return PREFIX + name();
     }
+
+    public static UserRole fromAuthority(String authority) {
+        return valueOf(authority.substring(PREFIX.length()));
+    }
 }

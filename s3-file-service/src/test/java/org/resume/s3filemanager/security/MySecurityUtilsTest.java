@@ -1,13 +1,8 @@
 package org.resume.s3filemanager.security;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -15,63 +10,10 @@ import static org.mockito.Mockito.when;
 
 class MySecurityUtilsTest {
 
-    private static final String ANONYMOUS_USER = "anonymousUser";
     private static final String IPV6_FULL = "0:0:0:0:0:0:0:1";
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-    }
-
-    // getCurrentUsername
-
     /**
-     * Нет аутентификации — возвращается null.
-     */
-    @Test
-    void getCurrentUsername_returnsNull_whenNoAuthentication() {
-        SecurityContextHolder.clearContext();
-
-        assertThat(MySecurityUtils.getCurrentUsername()).isNull();
-    }
-
-    /**
-     * Анонимный пользователь — возвращается null.
-     */
-    @Test
-    void getCurrentUsername_returnsNull_whenAnonymousUser() {
-        var auth = new UsernamePasswordAuthenticationToken(ANONYMOUS_USER, null, List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        assertThat(MySecurityUtils.getCurrentUsername()).isNull();
-    }
-
-    /**
-     * Аутентифицированный пользователь — возвращается имя.
-     */
-    @Test
-    void getCurrentUsername_returnsUsername_whenAuthenticated() {
-        var auth = new UsernamePasswordAuthenticationToken("john", null, List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        assertThat(MySecurityUtils.getCurrentUsername()).isEqualTo("john");
-    }
-
-    /**
-     * Principal не является строкой — возвращается null.
-     */
-    @Test
-    void getCurrentUsername_returnsNull_whenPrincipalIsNotString() {
-        var auth = new UsernamePasswordAuthenticationToken(new Object(), null, List.of());
-        SecurityContextHolder.getContext().setAuthentication(auth);
-
-        assertThat(MySecurityUtils.getCurrentUsername()).isNull();
-    }
-
-    // extractClientIp
-
-    /**
-     * Request равен null — возвращается null.
+     * Request равен null: возвращается null.
      */
     @Test
     void extractClientIp_returnsNull_whenRequestIsNull() {
@@ -79,7 +21,7 @@ class MySecurityUtilsTest {
     }
 
     /**
-     * Заголовок X-Forwarded-For намеренно игнорируется — возвращается RemoteAddr.
+     * Заголовок X-Forwarded-For намеренно игнорируется, возвращается RemoteAddr.
      */
     @Test
     void extractClientIp_ignoresXForwardedFor_returnsRemoteAddr() {
@@ -91,7 +33,7 @@ class MySecurityUtilsTest {
     }
 
     /**
-     * Заголовок X-Real-IP присутствует, X-Forwarded-For отсутствует — возвращается X-Real-IP.
+     * Есть заголовок X-Real-IP: возвращается он.
      */
     @Test
     void extractClientIp_returnsXRealIp_whenNoXForwardedFor() {
@@ -102,7 +44,7 @@ class MySecurityUtilsTest {
     }
 
     /**
-     * RemoteAddr — полный IPv6 localhost — нормализуется в 127.0.0.1.
+     * Полный IPv6 localhost нормализуется в 127.0.0.1.
      */
     @Test
     void extractClientIp_normalizesIPv6Localhost_toIPv4() {
@@ -115,7 +57,7 @@ class MySecurityUtilsTest {
     }
 
     /**
-     * RemoteAddr — сокращённый IPv6 localhost — нормализуется в 127.0.0.1.
+     * Сокращённый IPv6 localhost нормализуется в 127.0.0.1.
      */
     @Test
     void extractClientIp_normalizesShortIPv6Localhost_toIPv4() {
@@ -128,7 +70,7 @@ class MySecurityUtilsTest {
     }
 
     /**
-     * Нет заголовков — возвращается RemoteAddr.
+     * Нет заголовков: возвращается RemoteAddr.
      */
     @Test
     void extractClientIp_returnsRemoteAddr_whenNoHeaders() {

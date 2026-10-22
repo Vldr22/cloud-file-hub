@@ -7,10 +7,12 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.resume.s3filemanager.constant.SuccessMessages;
+import org.resume.s3filemanager.constant.ApiPaths;
 import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
+import org.resume.s3filemanager.dto.FileResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
+import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.FileFacadeService;
 import org.resume.s3filemanager.validation.ValidBatchSize;
 import org.resume.s3filemanager.validation.ValidFile;
@@ -18,6 +20,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,7 +38,7 @@ import java.util.List;
  */
 @Validated
 @RestController
-@RequestMapping("api/files")
+@RequestMapping(ApiPaths.FILES)
 @RequiredArgsConstructor
 @Tag(name = "Files", description = "Загрузка, скачивание и удаление файлов")
 public class FileController {
@@ -44,7 +47,7 @@ public class FileController {
 
     @Operation(summary = "Загрузить файл", description = "Загружает один файл. Обычные пользователи — только 1 файл, админы — без ограничений")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Файл загружен"),
+            @ApiResponse(responseCode = "201", description = "Файл загружен и ожидает антивирусной проверки"),
             @ApiResponse(responseCode = "400", description = "Неверный тип или формат файла"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Лимит загрузки исчерпан или пользователь заблокирован"),
@@ -53,11 +56,11 @@ public class FileController {
     })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<String> upload (
+    public CommonResponse<FileResponse> upload(
             @Parameter(description = "Файл для загрузки", required = true)
-            @RequestParam("file") @ValidFile MultipartFile file) {
-        fileFacadeService.uploadFile(file);
-        return CommonResponse.success(SuccessMessages.FILE_UPLOAD_SUCCESS);
+            @RequestParam("file") @ValidFile MultipartFile file,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        return CommonResponse.success(fileFacadeService.uploadFile(file, authenticatedUser));
     }
 
     @Operation(summary = "Множественная загрузка",
@@ -72,8 +75,9 @@ public class FileController {
     @ResponseStatus(HttpStatus.CREATED)
     public CommonResponse<List<MultipleUploadResponse>> multipleUpload(
             @Parameter(description = "Файлы для загрузки (до ${app.multiple-upload.max-batch-size})", required = true)
-            @RequestParam("files") @ValidBatchSize MultipartFile[] files) {
-        List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(files);
+            @RequestParam("files") @ValidBatchSize MultipartFile[] files,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(files, authenticatedUser);
         return CommonResponse.success(results);
     }
 
@@ -110,7 +114,8 @@ public class FileController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(
             @Parameter(description = "Уникальное имя файла", example = "212d7ce9-8451-4c4d-881e-d198593aa518.png")
-            @PathVariable String uniqueName) {
-        fileFacadeService.deleteFile(uniqueName);
+            @PathVariable String uniqueName,
+            @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
+        fileFacadeService.deleteFile(uniqueName, authenticatedUser);
     }
 }

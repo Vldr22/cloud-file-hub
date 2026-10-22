@@ -44,7 +44,7 @@
 Ограничения: файл до 30MB, тип проверяется по сигнатуре содержимого, rate limiting на Nginx (`auth` 5r/min, `upload` 2r/s, `api` 10r/s).
 
 **Доступ:**
-- API: https://cloudfilehub.duckdns.org/api/home
+- API: https://cloudfilehub.duckdns.org/api/v1/home
 - Swagger UI: https://cloudfilehub.duckdns.org/swagger-ui/index.html
 - Kafka UI: https://cloudfilehub.duckdns.org/kafka-ui/
 
@@ -52,15 +52,17 @@
 
 | Метод | Путь | Описание |
 |-------|------|---------|
-| `POST` | `/api/auth/register` | регистрация, роль USER |
-| `POST` | `/api/auth/login` | вход, JWT в HttpOnly cookie |
-| `POST` | `/api/auth/logout` | выход с отзывом токена из whitelist |
-| `GET` | `/api/home` | публичный список проверенных файлов |
-| `GET` | `/api/files/{uniqueName}` | скачивание файла без аутентификации |
-| `POST` | `/api/files/upload` | загрузка файла |
-| `POST` | `/api/files/multiple-upload` | пакетная загрузка, только ADMIN |
-| `DELETE` | `/api/files/{uniqueName}` | удаление своего файла, ADMIN удаляет любой |
-| `*` | `/api/admin/**` | пользователи, аудит-логи, статистика файлов, повторное сканирование и DLT |
+| `POST` | `/api/v1/auth/register` | регистрация, роль USER |
+| `POST` | `/api/v1/auth/login` | вход, JWT в HttpOnly cookie |
+| `POST` | `/api/v1/auth/logout` | выход с отзывом токена из whitelist |
+| `GET` | `/api/v1/users/me` | текущий пользователь: имя, роль, статус загрузки |
+| `GET` | `/api/v1/users/me/files` | свои файлы с любым статусом антивирусной проверки |
+| `GET` | `/api/v1/home` | публичный список проверенных файлов |
+| `GET` | `/api/v1/files/{uniqueName}` | скачивание файла без аутентификации |
+| `POST` | `/api/v1/files/upload` | загрузка файла |
+| `POST` | `/api/v1/files/multiple-upload` | пакетная загрузка, только ADMIN |
+| `DELETE` | `/api/v1/files/{uniqueName}` | удаление своего файла, ADMIN удаляет любой |
+| `*` | `/api/v1/admin/**` | пользователи, аудит-логи, статистика файлов, повторное сканирование и DLT |
 
 Полная спецификация: [docs/openapi.yaml](docs/openapi.yaml). Это снимок, deploy-версия доступна в [Swagger UI](https://cloudfilehub.duckdns.org/swagger-ui/index.html).
 

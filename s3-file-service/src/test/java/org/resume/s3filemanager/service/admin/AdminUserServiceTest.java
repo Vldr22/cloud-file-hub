@@ -7,12 +7,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.enums.UserStatus;
+import org.resume.s3filemanager.mapper.UserMapper;
+import org.resume.s3filemanager.mapper.UserMapperImpl;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.service.auth.UserService;
 import org.springframework.data.domain.Page;
@@ -37,6 +40,9 @@ class AdminUserServiceTest {
     @Mock
     private JwtWhitelistService jwtWhitelistService;
 
+    @Spy
+    private UserMapper userMapper = new UserMapperImpl();
+
     @InjectMocks
     private AdminUserService adminUserService;
 
@@ -53,7 +59,7 @@ class AdminUserServiceTest {
     }
 
     /**
-     * Список пользователей — возвращает страницу с DTO.
+     * Список пользователей: возвращает страницу с DTO.
      */
     @Test
     void shouldReturnUserPage_whenGetUsers() {
@@ -69,7 +75,7 @@ class AdminUserServiceTest {
     }
 
     /**
-     * Блокировка пользователя — статус меняется и JWT инвалидируется.
+     * Блокировка пользователя: статус меняется и JWT инвалидируется.
      */
     @Test
     void shouldBlockUserAndInvalidateToken_whenStatusIsBlocked() {
@@ -82,7 +88,7 @@ class AdminUserServiceTest {
     }
 
     /**
-     * Активация пользователя — статус меняется, JWT не трогаем.
+     * Активация пользователя: статус меняется, JWT не трогаем.
      */
     @Test
     void shouldActivateUser_whenStatusIsActive() {
@@ -95,7 +101,7 @@ class AdminUserServiceTest {
     }
 
     /**
-     * Изменение статуса загрузки — делегирует в UserService.
+     * Изменение статуса загрузки делегирует в UserService.
      */
     @Test
     void shouldChangeFileUploadStatus_whenCalled() {
@@ -107,7 +113,7 @@ class AdminUserServiceTest {
     }
 
     /**
-     * Удаление пользователя — JWT инвалидируется и пользователь удаляется.
+     * Удаление пользователя: JWT инвалидируется и пользователь удаляется.
      */
     @Test
     void shouldDeleteUser_whenCalled() {

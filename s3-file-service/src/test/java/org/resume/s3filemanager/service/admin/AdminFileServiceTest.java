@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.dto.AdminFileResponse;
@@ -16,6 +17,8 @@ import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.exception.FileNotFoundException;
 import org.resume.s3filemanager.exception.InvalidScanStatusException;
+import org.resume.s3filemanager.mapper.FileMapper;
+import org.resume.s3filemanager.mapper.FileMapperImpl;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.service.file.YandexStorageService;
 import org.resume.s3filemanager.service.kafka.OutboxService;
@@ -46,6 +49,9 @@ class AdminFileServiceTest {
     @Mock
     private YandexStorageService yandexStorageService;
 
+    @Spy
+    private FileMapper fileMapper = new FileMapperImpl();
+
     @InjectMocks
     private AdminFileService adminFileService;
 
@@ -70,7 +76,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Список файлов по статусу — возвращает страницу с DTO.
+     * Список файлов по статусу: возвращает страницу с DTO.
      */
     @Test
     void shouldReturnFilePage_whenFindAllByScanStatus() {
@@ -88,7 +94,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Повторное сканирование — статус меняется на PENDING_SCAN и событие публикуется.
+     * Повторное сканирование: статус меняется на PENDING_SCAN и событие публикуется.
      */
     @Test
     void shouldRetryScan_whenFileStatusIsError() {
@@ -104,7 +110,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Повторное сканирование — файл не найден, FileNotFoundException.
+     * Повторное сканирование: файл не найден, FileNotFoundException.
      */
     @Test
     void shouldThrowFileNotFoundException_whenFileNotFound() {
@@ -116,7 +122,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Повторное сканирование — статус не ERROR, InvalidScanStatusException.
+     * Повторное сканирование: статус не ERROR, InvalidScanStatusException.
      */
     @Test
     void shouldThrowInvalidScanStatusException_whenFileStatusIsNotError() {
@@ -132,7 +138,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Статистика файлов — возвращает количество по каждому статусу.
+     * Статистика файлов: возвращает количество по каждому статусу.
      */
     @Test
     void shouldReturnFileStats_whenGetFileStats() {
@@ -152,7 +158,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Удаление файлов не INFECTED — удаляет из S3 и метаданные.
+     * Удаление файлов не INFECTED: удаляет из S3 и метаданные.
      */
     @Test
     void shouldDeleteFromS3AndDb_whenStatusIsNotInfected() {
@@ -172,7 +178,7 @@ class AdminFileServiceTest {
     }
 
     /**
-     * Удаление INFECTED файлов — только метаданные, S3 не трогаем.
+     * Удаление INFECTED файлов: только метаданные, S3 не трогаем.
      */
     @Test
     void shouldDeleteOnlyMetadata_whenStatusIsInfected() {
