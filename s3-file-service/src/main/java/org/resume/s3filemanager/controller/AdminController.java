@@ -41,12 +41,13 @@ public class AdminController {
     @Operation(summary = "Журнал аудита", description = "Возвращает логи с фильтрацией по пользователю, операции, статусу и дате")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Успешно"),
+            @ApiResponse(responseCode = "400", description = "Начало периода позже конца"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Недостаточно прав")
     })
     @Parameter(name = "page", description = "Номер страницы", example = "0")
     @Parameter(name = "size", description = "Размер страницы", example = "20")
-    @PostMapping("/audit-logs")
+    @GetMapping("/audit-logs")
     public CommonResponse<PageResponse<AuditLogResponse>> getAuditLogs(
             @Valid @ParameterObject AuditLogFilter filter,
             @Parameter(hidden = true) Pageable pageable) {

@@ -25,6 +25,9 @@ public class ValidationMessages {
     public static final String FILE_PROCESSING_ERROR = "Error processing file validation";
     public static final String MAX_FILES_EXCEEDED = "Maximum %d files allowed per upload";
 
+    // Period
+    public static final String INVALID_DATE_RANGE = "Start of the period must not be after its end";
+
     // Generic validation
     public static final String VALIDATION_FAILED = "Validation failed";
 }
