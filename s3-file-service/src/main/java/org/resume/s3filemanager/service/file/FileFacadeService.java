@@ -8,11 +8,13 @@ import org.resume.s3filemanager.audit.Auditable;
 import org.resume.s3filemanager.audit.ResourceType;
 import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
+import org.resume.s3filemanager.dto.FileResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.exception.*;
+import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
 import org.resume.s3filemanager.validation.FileValidator;
@@ -27,10 +29,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Фасадный сервис для работы с файлами.
- * <p>
- * Координирует операции загрузки, скачивания и удаления файлов,
- * взаимодействуя с валидацией, s3 хранилищем и сервисами БД.
+ * Фасад загрузки, скачивания и удаления файлов: права, S3 и метаданные в БД.
  */
 @Slf4j
 @Service
@@ -44,42 +43,26 @@ public class FileFacadeService {
     private final FileValidator fileValidator;
     private final ErrorResponseStrategyResolver errorResponseStrategyResolver;
     private final S3KeyGenerator s3KeyGenerator;
+    private final FileMapper fileMapper;
 
     /**
-     * Загружает один файл с проверкой прав пользователя.
-     * <p>
-     * Выполняет следующие операции:
-     * <ul>
-     *   <li>Проверяет права пользователя на загрузку</li>
-     *   <li>Генерирует уникальное имя файла</li>
-     *   <li>Проверяет наличие дубликатов (в рамках пользователя)</li>
-     *   <li>Загружает файл в S3 хранилище</li>
-     *   <li>Сохраняет метаданные в базу данных</li>
-     * </ul>
+     * Загружает файл с проверкой лимита и дубликатов.
      *
-     * @param file загружаемый файл
-     * @param authenticatedUser пользователь текущего запроса
-     * @throws FileUploadLimitException если пользователь уже загрузил файл
-     * @throws DuplicateFileException если файл с таким хешем уже существует у пользователя
-     * @throws S3YandexException при ошибке загрузки в S3
+     * @return файл со статусом PENDING_SCAN
+     * @throws FileUploadLimitException если лимит загрузки исчерпан
+     * @throws DuplicateFileException если такой файл уже загружен пользователем
      */
     @Auditable(operation = AuditOperation.FILE_UPLOAD, resourceType = ResourceType.FILE)
-    public void uploadFile(MultipartFile file, AuthenticatedUser authenticatedUser) {
+    public FileResponse uploadFile(MultipartFile file, AuthenticatedUser authenticatedUser) {
         User user = filePermissionService.checkUploadPermission(authenticatedUser);
-        uploadFileInternal(file, user);
+        return fileMapper.toFileResponse(uploadFileInternal(file, user));
     }
 
     /**
-     * Множественная загрузка файлов (только для администратора).
-     * <p>
-     * Реализует паттерн частичного успеха: валидные файлы загружаются, в то время как
-     * невалидные отклоняются с конкретными сообщениями об ошибках. Хотя бы один файл
-     * должен быть успешно загружен.
+     * Пакетная загрузка с частичным успехом: ошибка одного файла не останавливает остальные.
      *
-     * @param files загружаемые файлы; количество ограничено настройкой батча
-     * @param authenticatedUser пользователь текущего запроса
-     * @return список результатов загрузки для каждого файла со статусом и сообщением
-     * @throws MultipleFileUploadException если все файлы не прошли загрузку
+     * @return результат по каждому файлу
+     * @throws MultipleFileUploadException если не загрузился ни один файл
      */
     public List<MultipleUploadResponse> multipleUpload(MultipartFile[] files, AuthenticatedUser authenticatedUser) {
         User admin = filePermissionService.checkUploadPermission(authenticatedUser);
@@ -105,13 +88,10 @@ public class FileFacadeService {
     }
 
     /**
-     * Скачивает файл по уникальному имени
+     * Скачивает файл, прошедший антивирусную проверку.
      *
-     * @param uniqueName the UUID-based unique filename
-     * @return file download response with content and metadata
-     * @throws FileNotFoundException if file metadata not found in database
-     * @throws FileNotAvailableException если файл не прошёл антивирусную проверку
-     * @throws S3YandexException if S3 download fails
+     * @throws FileNotFoundException если файл не найден
+     * @throws FileNotAvailableException если статус проверки не CLEAN
      */
     @Auditable(operation = AuditOperation.FILE_DOWNLOAD, resourceType = ResourceType.FILE)
     public FileDownloadResponse downloadFile(String uniqueName) {
@@ -137,15 +117,11 @@ public class FileFacadeService {
     }
 
     /**
-     * Удаляет файл с проверкой прав владения.
-     * <p>
-     * Пользователи могут удалять только свои файлы. Администраторы могут удалять любые файлы.
-     * Сбрасывает статус загрузки пользователя на NOT_UPLOADED, если владелец удаляет файл.
+     * Удаляет файл из S3 и БД и сбрасывает лимит загрузки владельца.
+     * Пользователь удаляет только свои файлы, админ любые.
      *
-     * @param uniqueName уникальное имя файла на основе UUID
-     * @param authenticatedUser пользователь текущего запроса
      * @throws FileNotFoundException если файл не найден
-     * @throws FileAccessDeniedException если пользователь пытается удалить чужой файл
+     * @throws FileAccessDeniedException если пользователь удаляет чужой файл
      */
     @Auditable(operation = AuditOperation.FILE_DELETE, resourceType = ResourceType.FILE)
     public void deleteFile(String uniqueName, AuthenticatedUser authenticatedUser) {
@@ -159,16 +135,9 @@ public class FileFacadeService {
     }
 
     /**
-     * Основная логика загрузки файла без проверки прав.
-     * <p>
-     * При ошибке сохранения метаданных выполняется компенсирующее
-     * удаление файла из S3.
-     *
-     * @param file загружаемый файл
-     * @param user пользователь-владелец файла
-     * @return уникальное имя загруженного файла
+     * Загрузка без проверки прав: при ошибке сохранения в БД файл удаляется из S3.
      */
-    private String uploadFileInternal(MultipartFile file, User user) {
+    private FileMetadata uploadFileInternal(MultipartFile file, User user) {
         String uniqueFileName = s3KeyGenerator.generate(file.getOriginalFilename());
         byte[] fileBytes = readFileBytes(file);
         String fileHash = fileHashService.calculateMD5(fileBytes);
@@ -177,10 +146,10 @@ public class FileFacadeService {
         fileStorageService.uploadFileYandexS3(uniqueFileName, fileBytes, file.getContentType());
 
         try {
-            fileMetadataService.saveFileWithOutboxEvent(file, uniqueFileName, fileHash, user);
+            FileMetadata saved = fileMetadataService.saveFileWithOutboxEvent(file, uniqueFileName, fileHash, user);
             log.info("File uploaded successfully: {}", uniqueFileName);
 
-            return uniqueFileName;
+            return saved;
         } catch (Exception e) {
             log.warn("DB save failed, rolling back S3 upload: {}", uniqueFileName);
             compensateS3Upload(uniqueFileName);
@@ -189,21 +158,17 @@ public class FileFacadeService {
     }
 
     /**
-     * Обрабатывает один файл в рамках пакетной загрузки.
-     * <p>
-     * Выполняет валидацию и загрузку, возвращая результат
-     * независимо от успеха (паттерн частичного успеха).
+     * Валидирует и загружает один файл пакета, ошибку возвращает результатом, а не исключением.
      */
     private MultipleUploadResponse processSingleFile(MultipartFile file, User admin) {
         try {
-
             Optional<String> validationError = fileValidator.validateFile(file);
             if (validationError.isPresent()) {
                 return createValidationErrorResponse(file, validationError.get());
             }
 
-            String uniqueName = uploadFileInternal(file, admin);
-            return createSuccessResponse(file, uniqueName);
+            FileMetadata saved = uploadFileInternal(file, admin);
+            return createSuccessResponse(file, saved.getUniqueName());
 
         } catch (Exception e) {
             return createExceptionErrorResponse(file, e);

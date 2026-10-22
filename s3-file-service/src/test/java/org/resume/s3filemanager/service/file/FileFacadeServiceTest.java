@@ -13,12 +13,15 @@ import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.constant.ErrorMessages;
 import org.resume.s3filemanager.constant.ValidationMessages;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
+import org.resume.s3filemanager.dto.FileResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.exception.*;
+import org.resume.s3filemanager.mapper.FileMapper;
+import org.resume.s3filemanager.mapper.FileMapperImpl;
 import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.strategy.DuplicateFileErrorStrategy;
 import org.resume.s3filemanager.service.file.strategy.ErrorResponseStrategyResolver;
@@ -69,6 +72,9 @@ class FileFacadeServiceTest {
     @Spy
     private S3KeyGenerator s3KeyGenerator = new S3KeyGenerator();
 
+    @Spy
+    private FileMapper fileMapper = new FileMapperImpl();
+
     @InjectMocks
     private FileFacadeService fileFacadeService;
 
@@ -93,7 +99,7 @@ class FileFacadeServiceTest {
     // uploadFile
 
     /**
-     * Успешная загрузка: файл уходит в S3, метаданные и событие сохраняются.
+     * Успешная загрузка: файл в S3, в ответе файл со статусом PENDING_SCAN.
      */
     @Test
     void shouldUploadFile_whenAllChecksPass() {
@@ -105,8 +111,10 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(user)))
                 .thenReturn(saved);
 
-        fileFacadeService.uploadFile(validPdfFile, authenticatedUser);
+        FileResponse response = fileFacadeService.uploadFile(validPdfFile, authenticatedUser);
 
+        assertThat(response.uniqueName()).isEqualTo(saved.getUniqueName());
+        assertThat(response.scanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
         verify(fileStorageService).uploadFileYandexS3(anyString(), any(), eq("application/pdf"));
         verify(fileMetadataService).saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(user));
     }

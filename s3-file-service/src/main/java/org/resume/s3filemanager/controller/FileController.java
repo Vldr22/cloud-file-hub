@@ -8,9 +8,9 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.resume.s3filemanager.constant.ApiPaths;
-import org.resume.s3filemanager.constant.SuccessMessages;
 import org.resume.s3filemanager.dto.CommonResponse;
 import org.resume.s3filemanager.dto.FileDownloadResponse;
+import org.resume.s3filemanager.dto.FileResponse;
 import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.security.AuthenticatedUser;
 import org.resume.s3filemanager.service.file.FileFacadeService;
@@ -47,7 +47,7 @@ public class FileController {
 
     @Operation(summary = "Загрузить файл", description = "Загружает один файл. Обычные пользователи — только 1 файл, админы — без ограничений")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Файл загружен"),
+            @ApiResponse(responseCode = "201", description = "Файл загружен и ожидает антивирусной проверки"),
             @ApiResponse(responseCode = "400", description = "Неверный тип или формат файла"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
             @ApiResponse(responseCode = "403", description = "Лимит загрузки исчерпан или пользователь заблокирован"),
@@ -56,12 +56,11 @@ public class FileController {
     })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public CommonResponse<String> upload (
+    public CommonResponse<FileResponse> upload(
             @Parameter(description = "Файл для загрузки", required = true)
             @RequestParam("file") @ValidFile MultipartFile file,
             @Parameter(hidden = true) @AuthenticationPrincipal AuthenticatedUser authenticatedUser) {
-        fileFacadeService.uploadFile(file, authenticatedUser);
-        return CommonResponse.success(SuccessMessages.FILE_UPLOAD_SUCCESS);
+        return CommonResponse.success(fileFacadeService.uploadFile(file, authenticatedUser));
     }
 
     @Operation(summary = "Множественная загрузка",
