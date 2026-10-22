@@ -56,6 +56,7 @@
 | `POST` | `/api/v1/auth/login` | вход, JWT в HttpOnly cookie |
 | `POST` | `/api/v1/auth/logout` | выход с отзывом токена из whitelist |
 | `GET` | `/api/v1/users/me` | текущий пользователь: имя, роль, статус загрузки |
+| `GET` | `/api/v1/users/me/files` | свои файлы с любым статусом антивирусной проверки |
 | `GET` | `/api/v1/home` | публичный список проверенных файлов |
 | `GET` | `/api/v1/files/{uniqueName}` | скачивание файла без аутентификации |
 | `POST` | `/api/v1/files/upload` | загрузка файла |

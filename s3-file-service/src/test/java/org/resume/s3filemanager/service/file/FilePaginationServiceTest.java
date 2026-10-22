@@ -79,4 +79,27 @@ class FilePaginationServiceTest {
 
         assertThat(result.getContent()).isEmpty();
     }
+
+    /**
+     * Файлы пользователя возвращаются с любым статусом проверки.
+     */
+    @Test
+    void shouldReturnUserFiles_withAnyScanStatus() {
+        String username = FAKER.name().username();
+        FileMetadata file = FileMetadata.builder()
+                .originalName(FAKER.file().fileName())
+                .uniqueName(FAKER.internet().uuid() + ".pdf")
+                .size(SIZE_BYTES)
+                .scanStatus(ScanStatus.ERROR)
+                .build();
+
+        Pageable pageable = PageRequest.of(0, 10);
+        when(fileMetadataRepository.findByUserUsername(username, pageable))
+                .thenReturn(new PageImpl<>(List.of(file)));
+
+        Page<FileResponse> result = filePaginationService.findUserFiles(username, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().scanStatus()).isEqualTo(ScanStatus.ERROR);
+    }
 }

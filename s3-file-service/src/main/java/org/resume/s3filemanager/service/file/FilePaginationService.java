@@ -10,7 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 /**
- * Сервис для постраничного получения списка проверенных файлов.
+ * Сервис для постраничного получения списков файлов.
  */
 @Service
 @RequiredArgsConstructor
@@ -27,6 +27,18 @@ public class FilePaginationService {
      */
     public Page<FileResponse> paginate(Pageable pageable) {
         return fileMetadataRepository.findByScanStatus(ScanStatus.CLEAN, pageable)
+                .map(fileMapper::toFileResponse);
+    }
+
+    /**
+     * Возвращает файлы пользователя с любым статусом проверки.
+     *
+     * @param username имя пользователя
+     * @param pageable параметры пагинации
+     * @return страница с файлами пользователя
+     */
+    public Page<FileResponse> findUserFiles(String username, Pageable pageable) {
+        return fileMetadataRepository.findByUserUsername(username, pageable)
                 .map(fileMapper::toFileResponse);
     }
 }

@@ -2,6 +2,7 @@ package org.resume.s3filemanager.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
+import org.resume.common.model.ScanStatus;
 
 @Builder
 @Schema(description = "Информация о файле")
@@ -13,5 +14,8 @@ public record FileResponse(
         String uniqueName,
 
         @Schema(description = "Размер файла в байтах", example = "1080033")
-        long fileSize) {
+        long fileSize,
+
+        @Schema(description = "Статус антивирусной проверки", example = "CLEAN")
+        ScanStatus scanStatus) {
 }

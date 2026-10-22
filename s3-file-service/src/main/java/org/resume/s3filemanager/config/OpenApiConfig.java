@@ -60,7 +60,7 @@ public class OpenApiConfig {
                 .tags(List.of(
                         new Tag().name("Home").description("Публичный доступ к списку файлов без аутентификации"),
                         new Tag().name("Auth").description("Регистрация, вход и выход из системы"),
-                        new Tag().name("Users").description("Данные текущего пользователя"),
+                        new Tag().name("Users").description("Данные и файлы текущего пользователя"),
                         new Tag().name("Files").description("Загрузка, скачивание и удаление файлов"),
                         new Tag().name("Admin").description("Управление пользователями, файлами и аудит-логами — только для администратора")
                 ))
