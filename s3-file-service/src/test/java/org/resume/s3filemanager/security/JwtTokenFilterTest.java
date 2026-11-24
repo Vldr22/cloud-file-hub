@@ -2,13 +2,13 @@ package org.resume.s3filemanager.security;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.s3filemanager.constant.ApiPaths;
-import org.resume.s3filemanager.constant.SecurityErrorMessages;
 import org.resume.s3filemanager.enums.UserRole;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -17,16 +17,18 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("JwtTokenFilter - аутентификация по JWT, отказ решает слой авторизации")
 class JwtTokenFilterTest {
 
     private static final String TOKEN = "test.jwt.token";
     private static final String USERNAME = "john";
     private static final String ROLE = UserRole.USER.getAuthority();
-    private static final String PROTECTED_PATH = ApiPaths.FILES;
-    private static final String PUBLIC_PATH = ApiPaths.AUTH + "/login";
+    private static final String PATH = ApiPaths.FILES;
 
     @Mock
     private JwtTokenService jwtTokenService;
@@ -37,9 +39,6 @@ class JwtTokenFilterTest {
     @Mock
     private JwtCookieService jwtCookieService;
 
-    @Mock
-    private SecurityExceptionHandler securityExceptionHandler;
-
     @InjectMocks
     private JwtTokenFilter jwtTokenFilter;
 
@@ -48,118 +47,96 @@ class JwtTokenFilterTest {
         SecurityContextHolder.clearContext();
     }
 
-    /**
-     * Без токена в cookie запрос идёт дальше по цепочке.
-     */
     @Test
-    void doFilterInternal_continuesChain_whenTokenIsNull() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
+    @DisplayName("doFilterInternal - без токена запрос идёт дальше по цепочке")
+    void doFilterInternal_shouldContinueChain_whenTokenIsNull() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", PATH);
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-
         when(jwtCookieService.extractToken(request)).thenReturn(null);
 
+        // when
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
+        // then
         assertThat(chain.getRequest()).isNotNull();
-        verifyNoInteractions(jwtTokenService, jwtWhitelistService, securityExceptionHandler);
+        verifyNoInteractions(jwtTokenService, jwtWhitelistService);
     }
 
-    /**
-     * Токена нет в whitelist: 401.
-     */
     @Test
-    void doFilterInternal_returns401_whenTokenNotInWhitelist() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
+    @DisplayName("doFilterInternal - токен не в whitelist: контекст очищен, запрос идёт дальше")
+    void doFilterInternal_shouldContinueChain_whenTokenNotInWhitelist() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", PATH);
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-
         when(jwtCookieService.extractToken(request)).thenReturn(TOKEN);
         when(jwtTokenService.extractSubject(TOKEN)).thenReturn(USERNAME);
         when(jwtWhitelistService.isValid(USERNAME, TOKEN)).thenReturn(false);
 
+        // when
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_INVALID);
-        assertThat(chain.getRequest()).isNull();
+        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(chain.getRequest()).isNotNull();
     }
 
-    /**
-     * Истёкший токен: 401 с TOKEN_EXPIRED.
-     */
     @Test
-    void doFilterInternal_returns401_whenTokenExpired() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
+    @DisplayName("doFilterInternal - истёкший токен: контекст очищен, запрос идёт дальше")
+    void doFilterInternal_shouldContinueChain_whenTokenExpired() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", PATH);
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-
         when(jwtCookieService.extractToken(request)).thenReturn(TOKEN);
         when(jwtTokenService.extractSubject(TOKEN)).thenThrow(mock(ExpiredJwtException.class));
 
+        // when
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_EXPIRED);
-        assertThat(chain.getRequest()).isNull();
+        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(chain.getRequest()).isNotNull();
     }
 
-    /**
-     * Невалидный токен: 401 с TOKEN_INVALID.
-     */
     @Test
-    void doFilterInternal_returns401_whenTokenInvalid() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
+    @DisplayName("doFilterInternal - невалидный токен: контекст очищен, запрос идёт дальше")
+    void doFilterInternal_shouldContinueChain_whenTokenInvalid() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", PATH);
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-
         when(jwtCookieService.extractToken(request)).thenReturn(TOKEN);
         when(jwtTokenService.extractSubject(TOKEN)).thenThrow(new RuntimeException());
 
+        // when
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
-        verify(securityExceptionHandler).sendUnauthorized(request, response, SecurityErrorMessages.TOKEN_INVALID);
-        assertThat(chain.getRequest()).isNull();
+        // then
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        assertThat(chain.getRequest()).isNotNull();
     }
 
-    /**
-     * Валидный токен: AuthenticatedUser в SecurityContext, запрос идёт дальше.
-     */
     @Test
-    void doFilterInternal_setsAuthentication_whenTokenValid() throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
+    @DisplayName("doFilterInternal - валидный токен: аутентификация в контексте, запрос идёт дальше")
+    void doFilterInternal_shouldSetAuthentication_whenTokenValid() throws Exception {
+        // given
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", PATH);
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-
         when(jwtCookieService.extractToken(request)).thenReturn(TOKEN);
         when(jwtTokenService.extractSubject(TOKEN)).thenReturn(USERNAME);
         when(jwtWhitelistService.isValid(USERNAME, TOKEN)).thenReturn(true);
         when(jwtTokenService.extractRole(TOKEN)).thenReturn(ROLE);
 
+        // when
         jwtTokenFilter.doFilterInternal(request, response, chain);
 
+        // then
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        assertThat(authentication.getName()).isEqualTo(USERNAME);
         assertThat(authentication.getPrincipal()).isEqualTo(new AuthenticatedUser(USERNAME, UserRole.USER));
         assertThat(chain.getRequest()).isNotNull();
-    }
-
-    /**
-     * Публичный путь фильтр не проверяет.
-     */
-    @Test
-    void shouldNotFilter_returnsTrue_forPublicPaths() {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", PUBLIC_PATH);
-
-        assertThat(jwtTokenFilter.shouldNotFilter(request)).isTrue();
-    }
-
-    /**
-     * Защищённый путь фильтр проверяет.
-     */
-    @Test
-    void shouldNotFilter_returnsFalse_forProtectedPaths() {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", PROTECTED_PATH);
-
-        assertThat(jwtTokenFilter.shouldNotFilter(request)).isFalse();
     }
 }
