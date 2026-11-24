@@ -43,8 +43,8 @@ services:
   kafka:
     image: apache/kafka:3.7.0
     container_name: cloudfilehub-kafka-dev
-    expose:
-      - "9092"
+    ports:
+      - "29092:29092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
@@ -72,6 +72,20 @@ services:
     networks:
       - cloudfilehub-net
 
+  s3mock:
+    image: adobe/s3mock:5.2.3
+    container_name: cloudfilehub-s3mock-dev
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: test-bucket
+      COM_ADOBE_TESTING_S3MOCK_STORE_REGION: ru-central1
+    ports:
+      - "9090:9090"
+    networks:
+      cloudfilehub-net:
+        aliases:
+          - s3mock
+          - test-bucket.s3mock
+
   clamav:
     image: clamav/clamav:1.5.2
     container_name: cloudfilehub-clamav-dev
@@ -82,8 +96,8 @@ services:
           clamd --foreground --config-file=/etc/clamav/clamd.conf"
     mem_limit: 1g
     mem_reservation: 512m
-    expose:
-      - "3310"
+    ports:
+      - "3310:3310"
     networks:
       cloudfilehub-net:
         aliases:
@@ -128,13 +142,20 @@ services:
         condition: service_healthy
       kafka:
         condition: service_healthy
+      s3mock:
+        condition: service_started
     env_file:
       - .env
     environment:
-      SPRING_PROFILES_ACTIVE: prod
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/s3filemanager
+      SPRING_DATA_REDIS_HOST: redis
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      CLAMAV_HOST: cloudfilehub-clamav
-      CLAMAV_PORT: 3310
+      YANDEX_STORAGE_ENDPOINT: http://s3mock:9090
+      YANDEX_STORAGE_REGION: ru-central1
+      YANDEX_STORAGE_BUCKETNAME: test-bucket
+      YANDEX_STORAGE_ACCESSKEY: test
+      YANDEX_STORAGE_SECRETKEY: test
     ports:
       - "8080:8080"
     restart: unless-stopped
@@ -151,13 +172,19 @@ services:
         condition: service_healthy
       clamav:
         condition: service_healthy
+      s3mock:
+        condition: service_started
+    env_file:
+      - .env
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      ACCESS_KEY: ${ACCESS_KEY}
-      SECRET_KEY: ${SECRET_KEY}
+      SPRING_PROFILES_ACTIVE: dev
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      CLAMAV_HOST: cloudfilehub-clamav
-      CLAMAV_PORT: 3310
+      YANDEX_STORAGE_ENDPOINT: http://s3mock:9090
+      YANDEX_STORAGE_REGION: ru-central1
+      YANDEX_STORAGE_BUCKETNAME: test-bucket
+      YANDEX_STORAGE_ACCESSKEY: test
+      YANDEX_STORAGE_SECRETKEY: test
+      CLAMAV_HOST: clamav
     ports:
       - "8081:8081"
     restart: unless-stopped

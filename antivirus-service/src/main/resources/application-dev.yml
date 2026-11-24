@@ -2,6 +2,15 @@ spring:
   kafka:
     bootstrap-servers: localhost:29092
 
+# === S3Mock (локальная замена Yandex Object Storage) ===
+yandex:
+  storage:
+    accessKey: test
+    secretKey: test
+    endpoint: http://localhost:9090
+    region: ru-central1
+    bucketName: test-bucket
+
 clamav:
   host: localhost
   port: 3310
@@ -13,4 +22,3 @@ logging:
     org.resume.fileantivirusservice: DEBUG
     org.springframework.transaction: DEBUG
     org.springframework.jdbc.datasource: DEBUG
-    ## software.amazon.awssdk: DEBUG
