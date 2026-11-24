@@ -150,6 +150,7 @@ services:
       SPRING_PROFILES_ACTIVE: dev
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/s3filemanager
       SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       YANDEX_STORAGE_ENDPOINT: http://s3mock:9090
       YANDEX_STORAGE_REGION: ru-central1
@@ -158,6 +159,12 @@ services:
       YANDEX_STORAGE_SECRETKEY: test
     ports:
       - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     networks:
       - cloudfilehub-net
@@ -187,6 +194,12 @@ services:
       CLAMAV_HOST: clamav
     ports:
       - "8081:8081"
+    healthcheck:
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8081/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
     restart: unless-stopped
     networks:
       - cloudfilehub-net

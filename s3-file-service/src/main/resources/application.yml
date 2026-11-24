@@ -86,3 +86,13 @@ springdoc:
   swagger-ui:
     display-request-duration: true
     try-it-out-enabled: true
+
+# === Actuator: наружу только health, без деталей компонентов ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
