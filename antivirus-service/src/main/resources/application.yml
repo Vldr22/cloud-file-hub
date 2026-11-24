@@ -24,6 +24,16 @@ spring:
 server:
   port: 8081
 
+# === Actuator: наружу только health, без деталей компонентов ===
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 # === Yandex Object Storage ===
 yandex:
   storage:

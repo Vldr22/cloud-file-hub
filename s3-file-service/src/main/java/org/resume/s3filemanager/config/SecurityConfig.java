@@ -70,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers(ApiPaths.AUTH + "/login", ApiPaths.AUTH + "/register").permitAll()
                         .requestMatchers(ApiPaths.HOME).permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+                        .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, ApiPaths.FILES + "/{uniqueName}").permitAll()
                         .requestMatchers(HttpMethod.POST, ApiPaths.FILES + "/upload").authenticated()
                         .requestMatchers(HttpMethod.DELETE, ApiPaths.FILES + "/{uniqueName}").authenticated()

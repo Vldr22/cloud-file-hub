@@ -1,7 +1,7 @@
 # === Development Profile ===
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/s3filemanager
+    url: jdbc:postgresql://localhost:5433/s3filemanager
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
 
@@ -14,12 +14,21 @@ spring:
   data:
     redis:
       host: localhost
-      port: 6379
+      port: 6380
       password: ${REDIS_PASSWORD}
       database: 0
 
   kafka:
     bootstrap-servers: localhost:29092
+
+# === S3Mock (локальная замена Yandex Object Storage) ===
+yandex:
+  storage:
+    accessKey: test
+    secretKey: test
+    endpoint: http://localhost:9090
+    region: ru-central1
+    bucketName: test-bucket
 
 # === Security ===
 app:
@@ -33,8 +42,6 @@ app:
 
   swagger:
     servers:
-      - url: http://localhost:8000
-        description: Local Docker (Nginx)
       - url: http://localhost:8080
         description: Local Direct
 
@@ -45,4 +52,3 @@ logging:
     org.resume.s3filemanager: DEBUG
     org.springframework.transaction: DEBUG
     org.springframework.jdbc.datasource: DEBUG
-
