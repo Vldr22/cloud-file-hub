@@ -81,7 +81,7 @@ public class OutboxEventProcessor {
         int newRetryCount = event.getRetryCount() + 1;
         event.setRetryCount(newRetryCount);
 
-        if (newRetryCount >= outboxProperties.getMaxRetryCount()) {
+        if (newRetryCount > outboxProperties.getMaxRetryCount()) {
             event.setStatus(OutboxStatus.FAILED);
             log.error("Outbox event permanently failed after {} retries: id={}",
                     outboxProperties.getMaxRetryCount(), event.getId(), e);
