@@ -15,7 +15,6 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.service.admin.AdminAuditService;
 import org.resume.s3filemanager.service.admin.AdminFileService;
 import org.resume.s3filemanager.service.admin.AdminUserService;
-import org.resume.s3filemanager.service.kafka.RetryDLTService;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -36,7 +35,6 @@ public class AdminController {
     private final AdminUserService adminUserService;
     private final AdminAuditService adminAuditService;
     private final AdminFileService adminFileService;
-    private final RetryDLTService retryDLTService;
 
     @Operation(summary = "Журнал аудита", description = "Возвращает логи с фильтрацией по пользователю, операции, статусу и дате")
     @ApiResponses({
@@ -122,17 +120,6 @@ public class AdminController {
             @Parameter(description = "Статус сканирования", example = "CLEAN") @RequestParam ScanStatus scanStatus,
             @Parameter(hidden = true) Pageable pageable) {
         return CommonResponse.success(PageResponse.from(adminFileService.findAllByScanStatus(scanStatus, pageable)));
-    }
-
-    @Operation(summary = "Повторить обработку DLT", description = "Переотправляет все сообщения из Dead Letter Topic для файлов со статусом ERROR")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Сообщения переотправлены"),
-            @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
-            @ApiResponse(responseCode = "403", description = "Недостаточно прав")
-    })
-    @PostMapping("/files/retry-dlt")
-    public CommonResponse<Integer> retryDlt() {
-        return CommonResponse.success(retryDLTService.retryFailedEvents());
     }
 
     @Operation(summary = "Повторить сканирование файла", description = "Отправляет файл на повторное сканирование. Только для статуса ERROR")
