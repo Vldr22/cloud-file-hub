@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.resume.common.model.FileScanResult;
@@ -38,58 +39,64 @@ class FileScanResultServiceTest {
         scanResult.setS3Key(s3Key);
     }
 
-    /**
-     * Файл чистый — статус обновляется, S3 не трогаем.
-     */
     @Test
+    @DisplayName("Обновляет статус чистого файла, S3 не трогает")
     void shouldUpdateStatus_whenFileIsClean() {
+        //given
         scanResult.setStatus(ScanStatus.CLEAN);
 
+        //when
         fileScanResultService.processScanResult(scanResult);
 
+        //then
         verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.CLEAN);
         verifyNoInteractions(yandexStorageService);
     }
 
-    /**
-     * Ошибка сканирования — статус обновляется, S3 не трогаем.
-     */
     @Test
+    @DisplayName("Обновляет статус при ошибке сканирования, S3 не трогает")
     void shouldUpdateStatus_whenScanResultIsError() {
+        //given
         scanResult.setStatus(ScanStatus.ERROR);
 
+        //when
         fileScanResultService.processScanResult(scanResult);
 
+        //then
         verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.ERROR);
         verifyNoInteractions(yandexStorageService);
     }
 
-    /**
-     * Заражённый файл — удаляется из S3, статус обновляется на INFECTED.
-     */
     @Test
-    void shouldDeleteFromS3AndUpdateStatus_whenFileIsInfected() {
+    @DisplayName("Блокирует заражённый файл статусом INFECTED до удаления из S3")
+    void shouldBlockThenDeleteFromS3_whenFileIsInfected() {
+        //given
         scanResult.setStatus(ScanStatus.INFECTED);
         scanResult.setVirusName(FAKER.lorem().word());
 
+        //when
         fileScanResultService.processScanResult(scanResult);
 
-        verify(yandexStorageService).deleteFileYandexS3(s3Key);
-        verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.INFECTED);
+        //then
+        InOrder inOrder = inOrder(fileMetadataService, yandexStorageService);
+        inOrder.verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.INFECTED);
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(s3Key);
     }
 
-    /**
-     * Заражённый файл, S3 падает — статус всё равно обновляется на INFECTED.
-     */
     @Test
-    void shouldUpdateStatus_whenInfectedFileFailsToDeleteFromS3() {
+    @DisplayName("Сохраняет статус INFECTED и не пробрасывает исключение при сбое удаления из S3")
+    void shouldKeepInfectedStatus_whenS3DeletionFails() {
+        //given
         scanResult.setStatus(ScanStatus.INFECTED);
         scanResult.setVirusName(FAKER.lorem().word());
-
         doThrow(new RuntimeException()).when(yandexStorageService).deleteFileYandexS3(s3Key);
 
+        //when
         fileScanResultService.processScanResult(scanResult);
 
-        verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.INFECTED);
+        //then
+        InOrder inOrder = inOrder(fileMetadataService, yandexStorageService);
+        inOrder.verify(fileMetadataService).updateScanStatus(s3Key, ScanStatus.INFECTED);
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(s3Key);
     }
 }

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -75,17 +76,18 @@ class AdminFileServiceTest {
         fileMetadata.setUser(user);
     }
 
-    /**
-     * Список файлов по статусу: возвращает страницу с DTO.
-     */
     @Test
+    @DisplayName("Возвращает страницу файлов с DTO при поиске по статусу")
     void shouldReturnFilePage_whenFindAllByScanStatus() {
+        //given
         Pageable pageable = PageRequest.of(0, 10);
         when(fileMetadataRepository.findByScanStatusWithUser(ScanStatus.CLEAN, pageable))
                 .thenReturn(new PageImpl<>(List.of(fileMetadata)));
 
+        //when
         Page<AdminFileResponse> result = adminFileService.findAllByScanStatus(ScanStatus.CLEAN, pageable);
 
+        //then
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().getFirst().uniqueName()).isEqualTo(fileMetadata.getUniqueName());
         assertThat(result.getContent().getFirst().scanStatus()).isEqualTo(ScanStatus.CLEAN);
@@ -93,43 +95,44 @@ class AdminFileServiceTest {
         verify(fileMetadataRepository).findByScanStatusWithUser(ScanStatus.CLEAN, pageable);
     }
 
-    /**
-     * Повторное сканирование: статус меняется на PENDING_SCAN и событие публикуется.
-     */
     @Test
+    @DisplayName("Меняет статус на PENDING_SCAN и сохраняет outbox-событие при повторном сканировании")
     void shouldRetryScan_whenFileStatusIsError() {
+        //given
         fileMetadata.setScanStatus(ScanStatus.ERROR);
         when(fileMetadataRepository.findById(fileMetadata.getId()))
                 .thenReturn(Optional.of(fileMetadata));
 
+        //when
         AdminFileResponse result = adminFileService.retryScan(fileMetadata.getId());
 
+        //then
         assertThat(result.scanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
         verify(fileMetadataRepository).save(fileMetadata);
         verify(outboxService).saveFileUploadEvent(fileMetadata, fileMetadata.getUser().getId());
     }
 
-    /**
-     * Повторное сканирование: файл не найден, FileNotFoundException.
-     */
     @Test
+    @DisplayName("Бросает FileNotFoundException при повторном сканировании несуществующего файла")
     void shouldThrowFileNotFoundException_whenFileNotFound() {
+        //given
         when(fileMetadataRepository.findById(fileMetadata.getId()))
                 .thenReturn(Optional.empty());
 
+        //when //then
         assertThatThrownBy(() -> adminFileService.retryScan(fileMetadata.getId()))
                 .isInstanceOf(FileNotFoundException.class);
     }
 
-    /**
-     * Повторное сканирование: статус не ERROR, InvalidScanStatusException.
-     */
     @Test
+    @DisplayName("Бросает InvalidScanStatusException и не сохраняет событие, если статус файла не ERROR")
     void shouldThrowInvalidScanStatusException_whenFileStatusIsNotError() {
+        //given
         fileMetadata.setScanStatus(ScanStatus.CLEAN);
         when(fileMetadataRepository.findById(fileMetadata.getId()))
                 .thenReturn(Optional.of(fileMetadata));
 
+        //when //then
         assertThatThrownBy(() -> adminFileService.retryScan(fileMetadata.getId()))
                 .isInstanceOf(InvalidScanStatusException.class);
 
@@ -137,19 +140,20 @@ class AdminFileServiceTest {
         verifyNoInteractions(outboxService);
     }
 
-    /**
-     * Статистика файлов: возвращает количество по каждому статусу.
-     */
     @Test
+    @DisplayName("Возвращает статистику файлов по каждому статусу сканирования")
     void shouldReturnFileStats_whenGetFileStats() {
+        //given
         when(fileMetadataRepository.countByScanStatus(ScanStatus.PENDING_SCAN)).thenReturn(3L);
         when(fileMetadataRepository.countByScanStatus(ScanStatus.CLEAN)).thenReturn(10L);
         when(fileMetadataRepository.countByScanStatus(ScanStatus.INFECTED)).thenReturn(1L);
         when(fileMetadataRepository.countByScanStatus(ScanStatus.ERROR)).thenReturn(2L);
         when(fileMetadataRepository.count()).thenReturn(16L);
 
+        //when
         FileStatsResponse result = adminFileService.getFileStats();
 
+        //then
         assertThat(result.pending()).isEqualTo(3L);
         assertThat(result.clean()).isEqualTo(10L);
         assertThat(result.infected()).isEqualTo(1L);
@@ -157,11 +161,10 @@ class AdminFileServiceTest {
         assertThat(result.total()).isEqualTo(16L);
     }
 
-    /**
-     * Удаление файлов не INFECTED: удаляет из S3 и метаданные.
-     */
     @Test
-    void shouldDeleteFromS3AndDb_whenStatusIsNotInfected() {
+    @DisplayName("Удаляет сначала метаданные из БД, затем объекты из S3")
+    void shouldDeleteMetadataThenS3_whenDeleteAllByScanStatus() {
+        //given
         FileMetadata second = new FileMetadata();
         second.setUniqueName(FAKER.internet().uuid() + ".pdf");
         second.setUser(user);
@@ -169,27 +172,53 @@ class AdminFileServiceTest {
         when(fileMetadataRepository.findAllByScanStatus(ScanStatus.ERROR))
                 .thenReturn(List.of(fileMetadata, second));
 
+        //when
         int deleted = adminFileService.deleteAllByScanStatus(ScanStatus.ERROR);
 
+        //then
         assertThat(deleted).isEqualTo(2);
-        verify(yandexStorageService).deleteFileYandexS3(fileMetadata.getUniqueName());
-        verify(yandexStorageService).deleteFileYandexS3(second.getUniqueName());
-        verify(fileMetadataRepository).deleteAll(List.of(fileMetadata, second));
+        InOrder inOrder = inOrder(fileMetadataRepository, yandexStorageService);
+        inOrder.verify(fileMetadataRepository).deleteAll(List.of(fileMetadata, second));
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(fileMetadata.getUniqueName());
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(second.getUniqueName());
     }
 
-    /**
-     * Удаление INFECTED файлов: только метаданные, S3 не трогаем.
-     */
     @Test
-    void shouldDeleteOnlyMetadata_whenStatusIsInfected() {
+    @DisplayName("Продолжает удаление остальных файлов из S3 при сбое на одном")
+    void shouldContinueStorageCleanup_whenS3FailsForOneFile() {
+        //given
+        FileMetadata second = new FileMetadata();
+        second.setUniqueName(FAKER.internet().uuid() + ".pdf");
+        second.setUser(user);
+
+        when(fileMetadataRepository.findAllByScanStatus(ScanStatus.ERROR))
+                .thenReturn(List.of(fileMetadata, second));
+        doThrow(new RuntimeException()).when(yandexStorageService)
+                .deleteFileYandexS3(fileMetadata.getUniqueName());
+
+        //when
+        int deleted = adminFileService.deleteAllByScanStatus(ScanStatus.ERROR);
+
+        //then
+        assertThat(deleted).isEqualTo(2);
+        verify(yandexStorageService).deleteFileYandexS3(second.getUniqueName());
+    }
+
+    @Test
+    @DisplayName("Удаляет заражённые файлы из БД и S3 наравне с другими статусами")
+    void shouldDeleteMetadataAndS3_whenStatusIsInfected() {
+        //given
         fileMetadata.setScanStatus(ScanStatus.INFECTED);
         when(fileMetadataRepository.findAllByScanStatus(ScanStatus.INFECTED))
                 .thenReturn(List.of(fileMetadata));
 
+        //when
         int deleted = adminFileService.deleteAllByScanStatus(ScanStatus.INFECTED);
 
+        //then
         assertThat(deleted).isEqualTo(1);
-        verifyNoInteractions(yandexStorageService);
-        verify(fileMetadataRepository).deleteAll(List.of(fileMetadata));
+        InOrder inOrder = inOrder(fileMetadataRepository, yandexStorageService);
+        inOrder.verify(fileMetadataRepository).deleteAll(List.of(fileMetadata));
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(fileMetadata.getUniqueName());
     }
 }
