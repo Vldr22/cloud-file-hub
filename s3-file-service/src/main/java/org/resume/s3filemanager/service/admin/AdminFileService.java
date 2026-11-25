@@ -45,6 +45,7 @@ public class AdminFileService {
      * @param fileId ID файла
      * @return обновлённая информация о файле
      */
+    @Transactional
     public AdminFileResponse retryScan(Long fileId) {
         FileMetadata file = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new FileNotFoundException(fileId.toString()));
