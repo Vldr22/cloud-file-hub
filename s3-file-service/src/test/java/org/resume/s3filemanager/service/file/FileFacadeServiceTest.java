@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -399,27 +400,47 @@ class FileFacadeServiceTest {
 
     // deleteFile
 
-    /**
-     * Успешное удаление: файл удаляется из S3 и БД.
-     */
     @Test
+    @DisplayName("Удаляет сначала метаданные из БД, затем объект из S3")
     void shouldDeleteFile_whenUserIsOwner() {
+        //given
         FileMetadata file = buildFileMetadata();
         String uniqueName = file.getUniqueName();
 
         when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(file);
 
+        //when
         fileFacadeService.deleteFile(uniqueName, authenticatedUser);
 
-        verify(fileStorageService).deleteFileYandexS3(uniqueName);
-        verify(fileMetadataService).deleteFileAndUpdateUserStatus(file);
+        //then
+        InOrder inOrder = inOrder(fileMetadataService, fileStorageService);
+        inOrder.verify(fileMetadataService).deleteFileAndUpdateUserStatus(file);
+        inOrder.verify(fileStorageService).deleteFileYandexS3(uniqueName);
     }
 
-    /**
-     * Нет прав на удаление чужого файла: FileAccessDeniedException, файл не трогаем.
-     */
     @Test
+    @DisplayName("Удаление из БД остаётся в силе и исключение не пробрасывается при сбое S3")
+    void shouldKeepDeletion_whenS3CleanupFails() {
+        //given
+        FileMetadata file = buildFileMetadata();
+        String uniqueName = file.getUniqueName();
+
+        when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(file);
+        doThrow(new RuntimeException()).when(fileStorageService).deleteFileYandexS3(uniqueName);
+
+        //when
+        fileFacadeService.deleteFile(uniqueName, authenticatedUser);
+
+        //then
+        InOrder inOrder = inOrder(fileMetadataService, fileStorageService);
+        inOrder.verify(fileMetadataService).deleteFileAndUpdateUserStatus(file);
+        inOrder.verify(fileStorageService).deleteFileYandexS3(uniqueName);
+    }
+
+    @Test
+    @DisplayName("Бросает FileAccessDeniedException и не трогает файл при удалении чужого")
     void shouldThrowFileAccessDeniedException_whenUserIsNotOwner() {
+        //given
         FileMetadata file = buildFileMetadata();
         String uniqueName = file.getUniqueName();
 
@@ -427,6 +448,7 @@ class FileFacadeServiceTest {
         doThrow(new FileAccessDeniedException())
                 .when(filePermissionService).checkDeletePermission(authenticatedUser, file);
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.deleteFile(uniqueName, authenticatedUser))
                 .isInstanceOf(FileAccessDeniedException.class);
 
@@ -434,7 +456,6 @@ class FileFacadeServiceTest {
         verify(fileMetadataService, never()).deleteFileAndUpdateUserStatus(any());
     }
 
-    // helpers
     private FileMetadata buildFileMetadata() {
         return buildFileMetadataWithName(FAKER.file().fileName(
                 null,

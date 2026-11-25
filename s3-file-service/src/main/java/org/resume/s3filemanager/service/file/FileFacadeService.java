@@ -119,7 +119,9 @@ public class FileFacadeService {
     }
 
     /**
-     * Удаляет файл из S3 и БД и сбрасывает лимит загрузки владельца.
+     * Удаляет файл: метаданные и сброс лимита владельца транзакцией БД,
+     * затем объект из S3 вне транзакции. При сбое S3 объект остаётся в бакете,
+     * но файл уже недоступен через API.
      * Пользователь удаляет только свои файлы, админ любые.
      *
      * @throws FileNotFoundException     если файл не найден
@@ -130,8 +132,13 @@ public class FileFacadeService {
         FileMetadata file = fileMetadataService.findByUniqueName(uniqueName);
         filePermissionService.checkDeletePermission(authenticatedUser, file);
 
-        fileStorageService.deleteFileYandexS3(uniqueName);
         fileMetadataService.deleteFileAndUpdateUserStatus(file);
+
+        try {
+            fileStorageService.deleteFileYandexS3(uniqueName);
+        } catch (Exception e) {
+            log.error("File metadata deleted but S3 cleanup failed, orphan object left: {}", uniqueName, e);
+        }
 
         log.info("File deleted successfully: {}", uniqueName);
     }
