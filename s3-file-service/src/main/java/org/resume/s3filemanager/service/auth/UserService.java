@@ -3,19 +3,24 @@ package org.resume.s3filemanager.service.auth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
+import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
+import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * Сервис для управления пользователями системы.
@@ -30,9 +35,14 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final FileMetadataRepository fileMetadataRepository;
 
     /**
      * Создает нового пользователя с ролью USER.
+     * <p>
+     * Ранняя проверка имени даёт дружелюбный 409 без попытки insert;
+     * гонку параллельных регистраций закрывает уникальный constraint БД -
+     * его нарушение перехватывается и приводит к тому же исключению.
      *
      * @param password пароль в открытом виде - хеш будет присвоен перед сохранением
      * @throws UserAlreadyExistsException если пользователь с таким именем уже существует
@@ -48,7 +58,12 @@ public class UserService {
         user.setRole(UserRole.USER);
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent registration detected for username: {}", username);
+            throw new UserAlreadyExistsException();
+        }
     }
 
     /**
@@ -89,23 +104,24 @@ public class UserService {
     }
 
     /**
-     * Обновляет статус загрузки файлов для пользователя.
-     * <p>
-     * Используется для изменения статуса с NOT_UPLOADED на FILE_UPLOADED
-     * после загрузки файла, или обратно после удаления.
-     *
-     * @param user пользователь для обновления
-     * @param status новый статус загрузки
+     * Обновляет статус загрузки в бизнес-потоке. Не касается пользователей
+     * с UNLIMITED: безлимит выдаёт и снимает только админ через {@link #overrideUploadStatus}.
      */
     @Transactional
     public void updateUploadStatus(User user, FileUploadStatus status) {
-
         if (user.getUploadStatus() == FileUploadStatus.UNLIMITED) {
             log.debug("Upload status not changed for {}: user has UNLIMITED", user.getUsername());
             return;
         }
-        user.setUploadStatus(status);
-        userRepository.save(user);
+        applyUploadStatus(user, status);
+    }
+
+    /**
+     * Административная перезапись статуса загрузки, включая UNLIMITED.
+     */
+    @Transactional
+    public void overrideUploadStatus(User user, FileUploadStatus uploadStatus) {
+        applyUploadStatus(user, uploadStatus);
     }
 
     public Page<User> findAll(Pageable pageable) {
@@ -123,14 +139,24 @@ public class UserService {
         userRepository.save(user);
     }
 
-    @Transactional
-    public void updateStatus(User user, FileUploadStatus uploadStatus) {
+    private void applyUploadStatus(User user, FileUploadStatus uploadStatus) {
         user.setUploadStatus(uploadStatus);
         userRepository.save(user);
     }
 
+    /**
+     * Удаляет пользователя и его файлы одной транзакцией.
+     *
+     * @return S3-ключи удалённых файлов для очистки бакета вне транзакции
+     */
     @Transactional
-    public void delete(User user) {
+    public List<String> deleteWithFiles(User user) {
+        List<FileMetadata> files = fileMetadataRepository.findAllByUserId(user.getId());
+        fileMetadataRepository.deleteAll(files);
         userRepository.delete(user);
+
+        return files.stream()
+                .map(FileMetadata::getUniqueName)
+                .toList();
     }
 }

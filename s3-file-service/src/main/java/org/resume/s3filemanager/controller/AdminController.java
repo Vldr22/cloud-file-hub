@@ -15,7 +15,6 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.service.admin.AdminAuditService;
 import org.resume.s3filemanager.service.admin.AdminFileService;
 import org.resume.s3filemanager.service.admin.AdminUserService;
-import org.resume.s3filemanager.service.kafka.RetryDLTService;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -36,7 +35,6 @@ public class AdminController {
     private final AdminUserService adminUserService;
     private final AdminAuditService adminAuditService;
     private final AdminFileService adminFileService;
-    private final RetryDLTService retryDLTService;
 
     @Operation(summary = "Журнал аудита", description = "Возвращает логи с фильтрацией по пользователю, операции, статусу и дате")
     @ApiResponses({
@@ -95,7 +93,7 @@ public class AdminController {
         return CommonResponse.success(adminUserService.changeFileUploadStatus(userId, uploadStatus));
     }
 
-    @Operation(summary = "Удалить пользователя", description = "Удаляет пользователя и инвалидирует его токен")
+    @Operation(summary = "Удалить пользователя", description = "Удаляет пользователя вместе с его файлами (сначала БД, затем S3) и инвалидирует его токен")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Пользователь удалён"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
@@ -124,17 +122,6 @@ public class AdminController {
         return CommonResponse.success(PageResponse.from(adminFileService.findAllByScanStatus(scanStatus, pageable)));
     }
 
-    @Operation(summary = "Повторить обработку DLT", description = "Переотправляет все сообщения из Dead Letter Topic для файлов со статусом ERROR")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Сообщения переотправлены"),
-            @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),
-            @ApiResponse(responseCode = "403", description = "Недостаточно прав")
-    })
-    @PostMapping("/files/retry-dlt")
-    public CommonResponse<Integer> retryDlt() {
-        return CommonResponse.success(retryDLTService.retryFailedEvents());
-    }
-
     @Operation(summary = "Повторить сканирование файла", description = "Отправляет файл на повторное сканирование. Только для статуса ERROR")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Файл отправлен на сканирование"),
@@ -160,7 +147,7 @@ public class AdminController {
         return CommonResponse.success(adminFileService.getFileStats());
     }
 
-    @Operation(summary = "Удалить файлы по статусу", description = "Для INFECTED — только метаданные (S3 уже очищен). Для остальных — удаляет и из S3, и метаданные")
+    @Operation(summary = "Удалить файлы по статусу", description = "Удаляет метаданные и объекты из S3 для всех файлов с указанным статусом сканирования")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Файлы удалены, в ответе количество удалённых записей"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),

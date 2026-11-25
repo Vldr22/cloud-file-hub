@@ -6,6 +6,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -18,6 +19,7 @@ import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.mapper.UserMapperImpl;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.service.auth.UserService;
+import org.resume.s3filemanager.service.file.YandexStorageService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -29,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AdminUserService — административные операции с пользователями")
+@DisplayName("AdminUserService - административные операции с пользователями")
 class AdminUserServiceTest {
 
     private static final Faker FAKER = new Faker();
@@ -39,6 +41,9 @@ class AdminUserServiceTest {
 
     @Mock
     private JwtWhitelistService jwtWhitelistService;
+
+    @Mock
+    private YandexStorageService yandexStorageService;
 
     @Spy
     private UserMapper userMapper = new UserMapperImpl();
@@ -58,70 +63,115 @@ class AdminUserServiceTest {
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
     }
 
-    /**
-     * Список пользователей: возвращает страницу с DTO.
-     */
     @Test
+    @DisplayName("Возвращает страницу пользователей с DTO")
     void shouldReturnUserPage_whenGetUsers() {
+        //given
         Pageable pageable = PageRequest.of(0, 10);
         when(userService.findAll(pageable)).thenReturn(new PageImpl<>(List.of(user)));
 
+        //when
         Page<UserDetailsResponse> result = adminUserService.getUsers(pageable);
 
+        //then
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().getFirst().username()).isEqualTo(user.getUsername());
         assertThat(result.getContent().getFirst().role()).isEqualTo(UserRole.USER);
         verify(userService).findAll(pageable);
     }
 
-    /**
-     * Блокировка пользователя: статус меняется и JWT инвалидируется.
-     */
     @Test
+    @DisplayName("Меняет статус на BLOCKED и инвалидирует JWT токен")
     void shouldBlockUserAndInvalidateToken_whenStatusIsBlocked() {
+        //given
         when(userService.findById(user.getId())).thenReturn(user);
 
+        //when
         adminUserService.changeStatus(user.getId(), UserStatus.BLOCKED);
 
+        //then
         verify(userService).updateStatus(user, UserStatus.BLOCKED);
         verify(jwtWhitelistService).deleteToken(user.getUsername());
     }
 
-    /**
-     * Активация пользователя: статус меняется, JWT не трогаем.
-     */
     @Test
+    @DisplayName("Меняет статус на ACTIVE и не трогает JWT токен")
     void shouldActivateUser_whenStatusIsActive() {
+        //given
         when(userService.findById(user.getId())).thenReturn(user);
 
+        //when
         adminUserService.changeStatus(user.getId(), UserStatus.ACTIVE);
 
+        //then
         verify(userService).updateStatus(user, UserStatus.ACTIVE);
         verify(jwtWhitelistService, never()).deleteToken(anyString());
     }
 
-    /**
-     * Изменение статуса загрузки делегирует в UserService.
-     */
     @Test
+    @DisplayName("Меняет статус загрузки файлов пользователя")
     void shouldChangeFileUploadStatus_whenCalled() {
+        //given
         when(userService.findById(user.getId())).thenReturn(user);
 
+        //when
         adminUserService.changeFileUploadStatus(user.getId(), FileUploadStatus.UNLIMITED);
 
-        verify(userService).updateStatus(user, FileUploadStatus.UNLIMITED);
+        //then
+        verify(userService).overrideUploadStatus(user, FileUploadStatus.UNLIMITED);
     }
 
-    /**
-     * Удаление пользователя: JWT инвалидируется и пользователь удаляется.
-     */
     @Test
-    void shouldDeleteUser_whenCalled() {
-        when(userService.findById(user.getId())).thenReturn(user);
+    @DisplayName("Инвалидирует токен, удаляет пользователя с файлами из БД, затем объекты из S3")
+    void shouldDeleteUserWithFiles_thenCleanupS3() {
+        //given
+        String firstKey = FAKER.internet().uuid() + ".pdf";
+        String secondKey = FAKER.internet().uuid() + ".pdf";
 
+        when(userService.findById(user.getId())).thenReturn(user);
+        when(userService.deleteWithFiles(user)).thenReturn(List.of(firstKey, secondKey));
+
+        //when
         adminUserService.deleteUser(user.getId());
 
+        //then
+        InOrder inOrder = inOrder(jwtWhitelistService, userService, yandexStorageService);
+        inOrder.verify(jwtWhitelistService).deleteToken(user.getUsername());
+        inOrder.verify(userService).deleteWithFiles(user);
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(firstKey);
+        inOrder.verify(yandexStorageService).deleteFileYandexS3(secondKey);
+    }
+
+    @Test
+    @DisplayName("Удаление пользователя остаётся в силе при сбое S3 на одном из файлов")
+    void shouldKeepUserDeletion_whenS3CleanupFails() {
+        //given
+        String firstKey = FAKER.internet().uuid() + ".pdf";
+        String secondKey = FAKER.internet().uuid() + ".pdf";
+
+        when(userService.findById(user.getId())).thenReturn(user);
+        when(userService.deleteWithFiles(user)).thenReturn(List.of(firstKey, secondKey));
+        doThrow(new RuntimeException()).when(yandexStorageService).deleteFileYandexS3(firstKey);
+
+        //when
+        adminUserService.deleteUser(user.getId());
+
+        //then
+        verify(yandexStorageService).deleteFileYandexS3(secondKey);
+    }
+
+    @Test
+    @DisplayName("Удаляет пользователя без файлов, S3 не вызывает")
+    void shouldDeleteUserWithoutFiles_whenUserHasNoFiles() {
+        //given
+        when(userService.findById(user.getId())).thenReturn(user);
+        when(userService.deleteWithFiles(user)).thenReturn(List.of());
+
+        //when
+        adminUserService.deleteUser(user.getId());
+
+        //then
         verify(jwtWhitelistService).deleteToken(user.getUsername());
-        verify(userService).delete(user);
+        verifyNoInteractions(yandexStorageService);
     }
 }

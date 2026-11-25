@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.javafaker.Faker;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -71,10 +72,8 @@ class OutboxEventProcessorTest {
                 .build();
     }
 
-    /**
-     * Успешная отправка — статус меняется на SENT, sentAt устанавливается.
-     */
     @Test
+    @DisplayName("Успешная отправка - статус меняется на SENT, sentAt устанавливается")
     void shouldMarkAsSent_whenKafkaSendSucceeds() throws JsonProcessingException {
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenReturn(fileUploadEvent);
@@ -89,10 +88,8 @@ class OutboxEventProcessorTest {
         verify(outboxRepository).save(outboxEvent);
     }
 
-    /**
-     * Ошибка Kafka — retry count увеличивается, nextRetryAt обновляется.
-     */
     @Test
+    @DisplayName("Ошибка Kafka - счётчик retry увеличивается, nextRetryAt обновляется")
     void shouldIncrementRetryCount_whenKafkaSendFails() throws JsonProcessingException {
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenReturn(fileUploadEvent);
@@ -110,13 +107,11 @@ class OutboxEventProcessorTest {
         verify(outboxRepository).save(outboxEvent);
     }
 
-    /**
-     * Достигнут лимит retry — статус меняется на FAILED, файл получает ERROR.
-     */
     @Test
-    void shouldMarkAsFailed_whenMaxRetryCountReached() throws JsonProcessingException {
+    @DisplayName("Ошибка после всех retry - статус меняется на FAILED, файл получает ERROR")
+    void shouldMarkAsFailed_whenAllRetriesAreExhausted() throws JsonProcessingException {
         FileMetadata file = FileMetadata.builder().id(FILE_ID).build();
-        outboxEvent.setRetryCount(2);
+        outboxEvent.setRetryCount(3);
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenReturn(fileUploadEvent);
         doThrow(new KafkaSendException(new RuntimeException(), FILE_ID))
@@ -127,18 +122,37 @@ class OutboxEventProcessorTest {
         outboxEventProcessor.process(outboxEvent);
 
         assertThat(outboxEvent.getStatus()).isEqualTo(OutboxStatus.FAILED);
-        assertThat(outboxEvent.getRetryCount()).isEqualTo(3);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(4);
         assertThat(file.getScanStatus()).isEqualTo(ScanStatus.ERROR);
 
         verify(outboxRepository).save(outboxEvent);
     }
 
-    /**
-     * Файл удалён до исчерпания retry — событие всё равно помечается FAILED.
-     */
     @Test
-    void shouldMarkAsFailed_whenFileAlreadyDeleted() throws JsonProcessingException {
+    @DisplayName("Счётчик retry достиг максимума - последняя разрешённая попытка ещё планируется")
+    void shouldScheduleRetry_whenRetryCountEqualsMax() throws JsonProcessingException {
         outboxEvent.setRetryCount(2);
+        when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
+                .thenReturn(fileUploadEvent);
+        doThrow(new KafkaSendException(new RuntimeException(), FILE_ID))
+                .when(fileEventProducer).sendFileUploadEvent(any());
+        when(outboxProperties.getMaxRetryCount()).thenReturn(3);
+        when(outboxProperties.getBaseBackoffMinutes()).thenReturn(5L);
+
+        outboxEventProcessor.process(outboxEvent);
+
+        assertThat(outboxEvent.getStatus()).isEqualTo(OutboxStatus.PENDING);
+        assertThat(outboxEvent.getRetryCount()).isEqualTo(3);
+        assertThat(outboxEvent.getNextRetryAt()).isAfter(Instant.now());
+
+        verify(outboxRepository).save(outboxEvent);
+        verifyNoInteractions(fileMetadataRepository);
+    }
+
+    @Test
+    @DisplayName("Файл удалён до исчерпания retry - событие всё равно помечается FAILED")
+    void shouldMarkAsFailed_whenFileAlreadyDeleted() throws JsonProcessingException {
+        outboxEvent.setRetryCount(3);
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenReturn(fileUploadEvent);
         doThrow(new KafkaSendException(new RuntimeException(), FILE_ID))
@@ -153,10 +167,8 @@ class OutboxEventProcessorTest {
         verify(outboxRepository).save(outboxEvent);
     }
 
-    /**
-     * Ошибка десериализации — retry count увеличивается.
-     */
     @Test
+    @DisplayName("Ошибка десериализации - счётчик retry увеличивается")
     void shouldIncrementRetryCount_whenDeserializationFails() throws JsonProcessingException {
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenThrow(new JsonProcessingException("error") {
@@ -173,10 +185,8 @@ class OutboxEventProcessorTest {
         verify(outboxRepository).save(outboxEvent);
     }
 
-    /**
-     * Exponential backoff — задержка увеличивается с каждым retry.
-     */
     @Test
+    @DisplayName("Экспоненциальный backoff - задержка увеличивается с каждым retry")
     void shouldApplyExponentialBackoff_whenRetrying() throws JsonProcessingException {
         when(objectMapper.readValue(any(String.class), eq(FileUploadEvent.class)))
                 .thenReturn(fileUploadEvent);

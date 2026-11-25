@@ -25,8 +25,6 @@ public class ErrorMessages {
     public static final String FILE_NOT_AVAILABLE = "File is not available for download, scan status: %s";
 
     // Database
-    public static final String DATA_INTEGRITY_UNIQUE = "Record with this data already exists";
-    public static final String DATA_INTEGRITY_FK = "Cannot perform operation - related records exist";
     public static final String DATA_INTEGRITY_GENERIC = "Data integrity violation";
 
     // HTTP

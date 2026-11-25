@@ -232,16 +232,7 @@ public class GlobalExceptionHandler {
     public CommonResponse<Void> handleDataIntegrityViolation(DataIntegrityViolationException e) {
         log.error("Data integrity violation: {}", e.getMessage(), e);
 
-        String message = ErrorMessages.DATA_INTEGRITY_GENERIC;
-        if (e.getMessage() != null) {
-            if (e.getMessage().contains("unique") || e.getMessage().contains("duplicate")) {
-                message = ErrorMessages.DATA_INTEGRITY_UNIQUE;
-            } else if (e.getMessage().contains("foreign key")) {
-                message = ErrorMessages.DATA_INTEGRITY_FK;
-            }
-        }
-
-        return createErrorResponse(HttpStatus.CONFLICT, message);
+        return createErrorResponse(HttpStatus.CONFLICT, ErrorMessages.DATA_INTEGRITY_GENERIC);
     }
 
     // === S3 ===

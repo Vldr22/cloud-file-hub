@@ -1,6 +1,7 @@
 package org.resume.s3filemanager.service.admin;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.resume.common.model.ScanStatus;
 import org.resume.s3filemanager.dto.AdminFileResponse;
 import org.resume.s3filemanager.dto.FileStatsResponse;
@@ -24,6 +25,7 @@ import java.util.List;
  * Предоставляет функционал просмотра файлов по статусу
  * и повторного сканирования.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminFileService {
@@ -45,6 +47,7 @@ public class AdminFileService {
      * @param fileId ID файла
      * @return обновлённая информация о файле
      */
+    @Transactional
     public AdminFileResponse retryScan(Long fileId) {
         FileMetadata file = fileMetadataRepository.findById(fileId)
                 .orElseThrow(() -> new FileNotFoundException(fileId.toString()));
@@ -54,6 +57,7 @@ public class AdminFileService {
         }
 
         file.setScanStatus(ScanStatus.PENDING_SCAN);
+        file.setRetryCount(0);
         fileMetadataRepository.save(file);
 
         outboxService.saveFileUploadEvent(file, file.getUser().getId());
@@ -77,22 +81,34 @@ public class AdminFileService {
     }
 
     /**
-     * Удаляет все файлы с указанным статусом сканирования.
-     * Для INFECTED — только метаданные (S3 уже очищен).
-     * Для остальных — удаляет и из S3, и метаданные.
+     * Удаляет все файлы с указанным статусом сканирования: сначала метаданные
+     * одной транзакцией БД, затем объекты из S3 вне транзакции.
+     * S3 delete идемпотентен: отсутствующий объект не ошибка.
+     * При сбое удаления из S3 в бакете остаётся сирота - фиксируется в логе.
      *
      * @param scanStatus статус для удаления
      * @return количество удалённых записей
      */
-    @Transactional
     public int deleteAllByScanStatus(ScanStatus scanStatus) {
         List<FileMetadata> files = fileMetadataRepository.findAllByScanStatus(scanStatus);
 
-        if (scanStatus != ScanStatus.INFECTED) {
-            files.forEach(file -> yandexStorageService.deleteFileYandexS3(file.getUniqueName()));
-        }
-
         fileMetadataRepository.deleteAll(files);
+        deleteFromStorage(files);
+
         return files.size();
+    }
+
+    /**
+     * Удаляет файлы из S3 по одному; сбой на файле не мешает очистке остальных.
+     */
+    private void deleteFromStorage(List<FileMetadata> files) {
+        for (FileMetadata file : files) {
+            try {
+                yandexStorageService.deleteFileYandexS3(file.getUniqueName());
+            } catch (Exception e) {
+                log.error("Metadata deleted but S3 cleanup failed, orphan object left: uniqueName={}",
+                        file.getUniqueName(), e);
+            }
+        }
     }
 }

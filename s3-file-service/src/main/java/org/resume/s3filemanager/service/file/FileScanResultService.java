@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.resume.common.model.FileScanResult;
 import org.resume.common.model.ScanStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Сервис для обработки результатов антивирусного сканирования.
@@ -13,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Обрабатывает различные статусы сканирования:
  * <ul>
  *   <li>CLEAN — обновляет статус в БД</li>
- *   <li>INFECTED — удаляет файл из S3 и обновляет статус в БД</li>
+ *   <li>INFECTED — блокирует файл статусом в БД, затем удаляет из S3</li>
  *   <li>ERROR — обновляет статус в БД</li>
  * </ul>
  */
@@ -27,10 +26,11 @@ public class FileScanResultService {
 
     /**
      * Обрабатывает результат сканирования файла.
+     * <p>
+     * Не транзакционный: S3-вызов выполняется вне транзакции БД.
      *
      * @param result результат сканирования от antivirus-service
      */
-    @Transactional
     public void processScanResult(FileScanResult result) {
         String s3Key = result.getS3Key();
         ScanStatus status = result.getStatus();
@@ -43,7 +43,9 @@ public class FileScanResultService {
     }
 
     /**
-     * Обрабатывает заражённый файл: удаляет из S3 и обновляет статус.
+     * Обрабатывает заражённый файл: сначала блокирует его статусом INFECTED,
+     * затем удаляет из S3. При сбое удаления объект остаётся в бакете,
+     * но файл уже недоступен для скачивания.
      */
     private void handleInfectedFile(FileScanResult result) {
         String s3Key = result.getS3Key();
@@ -51,16 +53,15 @@ public class FileScanResultService {
         log.warn("Infected file detected: s3Key={}, virus={}",
                 s3Key, result.getVirusName());
 
+        fileMetadataService.updateScanStatus(s3Key, ScanStatus.INFECTED);
+
         try {
             yandexStorageService.deleteFileYandexS3(s3Key);
             log.debug("Infected file deleted from S3: s3Key={}", s3Key);
 
-            fileMetadataService.updateScanStatus(s3Key, ScanStatus.INFECTED);
-
         } catch (Exception e) {
-            log.error("Failed to handle infected file: s3Key={}, error={}",
-                    s3Key, e.getMessage());
-            fileMetadataService.updateScanStatus(s3Key, ScanStatus.INFECTED);
+            log.error("Infected file blocked but S3 deletion failed, orphan object left: s3Key={}",
+                    s3Key, e);
         }
     }
 }
