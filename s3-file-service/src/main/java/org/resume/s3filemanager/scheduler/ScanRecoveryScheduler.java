@@ -8,11 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduler для восстановления сканирования зависших файлов.
- * <p>
- * Периодически переотправляет на сканирование файлы, застрявшие в PENDING_SCAN.
- * Интервал настраивается через app.scan-recovery.scheduler-interval-ms.
- * При нескольких экземплярах приложения работает только один - ShedLock держит блокировку в таблице shedlock.
+ * Scheduler восстановления сканирования зависших файлов.
+ * Интервал - app.scan-recovery.scheduler-interval-ms, в кластере работает один экземпляр (ShedLock).
  */
 @Slf4j
 @Component

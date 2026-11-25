@@ -104,23 +104,24 @@ public class UserService {
     }
 
     /**
-     * Обновляет статус загрузки файлов для пользователя.
-     * <p>
-     * Используется для изменения статуса с NOT_UPLOADED на FILE_UPLOADED
-     * после загрузки файла, или обратно после удаления.
-     *
-     * @param user пользователь для обновления
-     * @param status новый статус загрузки
+     * Обновляет статус загрузки в бизнес-потоке. Не касается пользователей
+     * с UNLIMITED: безлимит выдаёт и снимает только админ через {@link #overrideUploadStatus}.
      */
     @Transactional
     public void updateUploadStatus(User user, FileUploadStatus status) {
-
         if (user.getUploadStatus() == FileUploadStatus.UNLIMITED) {
             log.debug("Upload status not changed for {}: user has UNLIMITED", user.getUsername());
             return;
         }
-        user.setUploadStatus(status);
-        userRepository.save(user);
+        applyUploadStatus(user, status);
+    }
+
+    /**
+     * Административная перезапись статуса загрузки, включая UNLIMITED.
+     */
+    @Transactional
+    public void overrideUploadStatus(User user, FileUploadStatus uploadStatus) {
+        applyUploadStatus(user, uploadStatus);
     }
 
     public Page<User> findAll(Pageable pageable) {
@@ -138,16 +139,14 @@ public class UserService {
         userRepository.save(user);
     }
 
-    @Transactional
-    public void updateStatus(User user, FileUploadStatus uploadStatus) {
+    private void applyUploadStatus(User user, FileUploadStatus uploadStatus) {
         user.setUploadStatus(uploadStatus);
         userRepository.save(user);
     }
 
     /**
-     * Удаляет пользователя и все его файлы одной транзакцией.
+     * Удаляет пользователя и его файлы одной транзакцией.
      *
-     * @param user пользователь для удаления
      * @return S3-ключи удалённых файлов для очистки бакета вне транзакции
      */
     @Transactional

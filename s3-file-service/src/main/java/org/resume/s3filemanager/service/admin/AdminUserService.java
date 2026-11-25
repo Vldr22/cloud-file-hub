@@ -68,17 +68,13 @@ public class AdminUserService {
      */
     public UserDetailsResponse changeFileUploadStatus(Long userId, FileUploadStatus uploadStatus) {
         User user = userService.findById(userId);
-        userService.updateStatus(user, uploadStatus);
+        userService.overrideUploadStatus(user, uploadStatus);
         return userMapper.toUserDetailsResponse(user);
     }
 
     /**
-     * Удаляет пользователя вместе с его файлами: метаданные файлов и пользователь
-     * удаляются одной транзакцией БД, затем объекты удаляются из S3 вне транзакции.
-     * При сбое S3 объект остаётся в бакете, но файлы уже недоступны через API.
-     * Предварительно инвалидирует JWT токен.
-     *
-     * @param userId ID пользователя
+     * Удаляет пользователя с его файлами: инвалидирует токен, БД - одной транзакцией,
+     * затем S3. При сбое S3 объект остаётся в бакете, но файлы недоступны через API.
      */
     public void deleteUser(Long userId) {
         User user = userService.findById(userId);

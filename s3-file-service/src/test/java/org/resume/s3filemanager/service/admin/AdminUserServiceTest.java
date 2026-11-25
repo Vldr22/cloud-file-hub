@@ -118,7 +118,7 @@ class AdminUserServiceTest {
         adminUserService.changeFileUploadStatus(user.getId(), FileUploadStatus.UNLIMITED);
 
         //then
-        verify(userService).updateStatus(user, FileUploadStatus.UNLIMITED);
+        verify(userService).overrideUploadStatus(user, FileUploadStatus.UNLIMITED);
     }
 
     @Test

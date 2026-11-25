@@ -239,13 +239,30 @@ class UserServiceTest {
     }
 
     @Test
-    @DisplayName("Меняет FileUploadStatus и сохраняет пользователя")
-    void shouldUpdateFileUploadStatus_whenCalled() {
+    @DisplayName("Перезаписывает FileUploadStatus и сохраняет пользователя")
+    void shouldOverrideUploadStatus_whenCalled() {
+        //given
+        user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
+
         //when
-        userService.updateStatus(user, FileUploadStatus.FILE_UPLOADED);
+        userService.overrideUploadStatus(user, FileUploadStatus.UNLIMITED);
 
         //then
-        assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.FILE_UPLOADED);
+        assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.UNLIMITED);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    @DisplayName("Перезаписывает статус даже у пользователя с UNLIMITED, в отличие от updateUploadStatus")
+    void shouldOverrideUnlimitedStatus_whenAdminRemovesUnlimited() {
+        //given
+        user.setUploadStatus(FileUploadStatus.UNLIMITED);
+
+        //when
+        userService.overrideUploadStatus(user, FileUploadStatus.NOT_UPLOADED);
+
+        //then
+        assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.NOT_UPLOADED);
         verify(userRepository).save(user);
     }
 
