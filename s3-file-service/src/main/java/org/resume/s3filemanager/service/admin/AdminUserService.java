@@ -1,6 +1,7 @@
 package org.resume.s3filemanager.service.admin;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.dto.UserDetailsResponse;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
@@ -8,19 +9,24 @@ import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.mapper.UserMapper;
 import org.resume.s3filemanager.security.JwtWhitelistService;
 import org.resume.s3filemanager.service.auth.UserService;
+import org.resume.s3filemanager.service.file.YandexStorageService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 /**
  * Сервис административных операций с пользователями.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdminUserService {
 
     private final UserService userService;
     private final JwtWhitelistService jwtWhitelistService;
+    private final YandexStorageService yandexStorageService;
     private final UserMapper userMapper;
 
     /**
@@ -67,7 +73,9 @@ public class AdminUserService {
     }
 
     /**
-     * Удаляет пользователя из системы.
+     * Удаляет пользователя вместе с его файлами: метаданные файлов и пользователь
+     * удаляются одной транзакцией БД, затем объекты удаляются из S3 вне транзакции.
+     * При сбое S3 объект остаётся в бакете, но файлы уже недоступны через API.
      * Предварительно инвалидирует JWT токен.
      *
      * @param userId ID пользователя
@@ -75,6 +83,16 @@ public class AdminUserService {
     public void deleteUser(Long userId) {
         User user = userService.findById(userId);
         jwtWhitelistService.deleteToken(user.getUsername());
-        userService.delete(user);
+
+        List<String> s3Keys = userService.deleteWithFiles(user);
+        s3Keys.forEach(this::deleteFromStorage);
+    }
+
+    private void deleteFromStorage(String uniqueName) {
+        try {
+            yandexStorageService.deleteFileYandexS3(uniqueName);
+        } catch (Exception e) {
+            log.error("User deleted but S3 cleanup failed, orphan object left: uniqueName={}", uniqueName, e);
+        }
     }
 }

@@ -95,7 +95,7 @@ public class AdminController {
         return CommonResponse.success(adminUserService.changeFileUploadStatus(userId, uploadStatus));
     }
 
-    @Operation(summary = "Удалить пользователя", description = "Удаляет пользователя и инвалидирует его токен")
+    @Operation(summary = "Удалить пользователя", description = "Удаляет пользователя вместе с его файлами (сначала БД, затем S3) и инвалидирует его токен")
     @ApiResponses({
             @ApiResponse(responseCode = "204", description = "Пользователь удалён"),
             @ApiResponse(responseCode = "401", description = "Токен отсутствует или истёк"),

@@ -3,12 +3,14 @@ package org.resume.s3filemanager.service.auth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.resume.s3filemanager.constant.SecurityErrorMessages;
+import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.FileUploadStatus;
 import org.resume.s3filemanager.enums.UserRole;
 import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
+import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +18,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * Сервис для управления пользователями системы.
@@ -30,6 +34,7 @@ public class UserService {
 
     private final PasswordEncoder passwordEncoder;
     private final UserRepository userRepository;
+    private final FileMetadataRepository fileMetadataRepository;
 
     /**
      * Создает нового пользователя с ролью USER.
@@ -129,8 +134,20 @@ public class UserService {
         userRepository.save(user);
     }
 
+    /**
+     * Удаляет пользователя и все его файлы одной транзакцией.
+     *
+     * @param user пользователь для удаления
+     * @return S3-ключи удалённых файлов для очистки бакета вне транзакции
+     */
     @Transactional
-    public void delete(User user) {
+    public List<String> deleteWithFiles(User user) {
+        List<FileMetadata> files = fileMetadataRepository.findAllByUserId(user.getId());
+        fileMetadataRepository.deleteAll(files);
         userRepository.delete(user);
+
+        return files.stream()
+                .map(FileMetadata::getUniqueName)
+                .toList();
     }
 }

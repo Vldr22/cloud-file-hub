@@ -37,5 +37,7 @@ public interface FileMetadataRepository extends JpaRepository<FileMetadata, Long
 
     List<FileMetadata> findAllByScanStatus(ScanStatus scanStatus);
 
+    List<FileMetadata> findAllByUserId(Long userId);
+
     long countByScanStatus(ScanStatus scanStatus);
 }
