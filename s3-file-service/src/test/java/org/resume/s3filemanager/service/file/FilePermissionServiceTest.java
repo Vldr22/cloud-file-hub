@@ -155,12 +155,11 @@ class FilePermissionServiceTest {
      */
     @Test
     void shouldMarkFileUploaded_whenStatusIsNotUploaded() {
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         filePermissionService.markFileUploaded(user.getId());
 
         assertThat(user.getUploadStatus()).isEqualTo(FileUploadStatus.FILE_UPLOADED);
-        verify(userRepository).save(user);
     }
 
     /**
@@ -169,7 +168,7 @@ class FilePermissionServiceTest {
     @Test
     void shouldNotChangeStatus_whenStatusIsUnlimited() {
         user.setUploadStatus(FileUploadStatus.UNLIMITED);
-        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdForUpdate(user.getId())).thenReturn(Optional.of(user));
 
         filePermissionService.markFileUploaded(user.getId());
 

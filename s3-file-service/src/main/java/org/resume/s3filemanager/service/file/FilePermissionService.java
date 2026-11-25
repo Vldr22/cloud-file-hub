@@ -48,7 +48,6 @@ public class FilePermissionService {
         }
 
         if (user.getUploadStatus() == FileUploadStatus.FILE_UPLOADED) {
-            log.warn("Upload denied: user {} already uploaded file", user.getUsername());
             throw new FileUploadLimitException();
         }
 
@@ -86,12 +85,17 @@ public class FilePermissionService {
      */
     @Transactional
     public void markFileUploaded(Long userId) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new UserNotFoundException(userId.toString()));
 
-        if (user.getUploadStatus() == FileUploadStatus.NOT_UPLOADED) {
-            user.setUploadStatus(FileUploadStatus.FILE_UPLOADED);
-            userRepository.save(user);
+        if (user.getUploadStatus() == FileUploadStatus.UNLIMITED) {
+            return;
         }
+
+        if (user.getUploadStatus() != FileUploadStatus.NOT_UPLOADED) {
+            throw new FileUploadLimitException();
+        }
+
+        user.setUploadStatus(FileUploadStatus.FILE_UPLOADED);
     }
 }
