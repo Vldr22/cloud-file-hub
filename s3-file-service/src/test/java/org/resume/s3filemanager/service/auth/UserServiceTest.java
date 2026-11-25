@@ -18,6 +18,7 @@ import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -94,6 +95,20 @@ class UserServiceTest {
                 .isInstanceOf(UserAlreadyExistsException.class);
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Бросает UserAlreadyExistsException при гонке параллельных регистраций")
+    void shouldThrowUserAlreadyExistsException_whenConcurrentRegistrationWinsRace() {
+        //given
+        when(userRepository.existsByUsername(username)).thenReturn(false);
+        when(passwordEncoder.encode(password)).thenReturn(FAKER.internet().password());
+        when(userRepository.save(any(User.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate key value violates unique constraint"));
+
+        //when //then
+        assertThatThrownBy(() -> userService.createUser(username, password))
+                .isInstanceOf(UserAlreadyExistsException.class);
     }
 
     @Test

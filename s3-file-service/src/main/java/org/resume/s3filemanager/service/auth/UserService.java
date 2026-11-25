@@ -12,6 +12,7 @@ import org.resume.s3filemanager.exception.UserAlreadyExistsException;
 import org.resume.s3filemanager.exception.UserNotFoundException;
 import org.resume.s3filemanager.repository.FileMetadataRepository;
 import org.resume.s3filemanager.repository.UserRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -38,6 +39,10 @@ public class UserService {
 
     /**
      * Создает нового пользователя с ролью USER.
+     * <p>
+     * Ранняя проверка имени даёт дружелюбный 409 без попытки insert;
+     * гонку параллельных регистраций закрывает уникальный constraint БД -
+     * его нарушение перехватывается и приводит к тому же исключению.
      *
      * @param password пароль в открытом виде - хеш будет присвоен перед сохранением
      * @throws UserAlreadyExistsException если пользователь с таким именем уже существует
@@ -53,7 +58,12 @@ public class UserService {
         user.setRole(UserRole.USER);
         user.setUploadStatus(FileUploadStatus.NOT_UPLOADED);
 
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrent registration detected for username: {}", username);
+            throw new UserAlreadyExistsException();
+        }
     }
 
     /**
