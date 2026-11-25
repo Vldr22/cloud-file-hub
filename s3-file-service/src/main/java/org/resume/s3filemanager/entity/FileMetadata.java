@@ -46,4 +46,8 @@ public class FileMetadata {
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private Instant uploadedAt;
+
+    @Builder.Default
+    @Column(nullable = false)
+    private int retryCount = 0;
 }

@@ -57,6 +57,7 @@ public class AdminFileService {
         }
 
         file.setScanStatus(ScanStatus.PENDING_SCAN);
+        file.setRetryCount(0);
         fileMetadataRepository.save(file);
 
         outboxService.saveFileUploadEvent(file, file.getUser().getId());

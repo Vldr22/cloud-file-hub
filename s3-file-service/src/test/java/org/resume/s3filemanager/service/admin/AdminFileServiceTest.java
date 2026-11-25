@@ -96,10 +96,11 @@ class AdminFileServiceTest {
     }
 
     @Test
-    @DisplayName("Меняет статус на PENDING_SCAN и сохраняет outbox-событие при повторном сканировании")
+    @DisplayName("Меняет статус на PENDING_SCAN, сбрасывает счётчик попыток и сохраняет outbox-событие при повторном сканировании")
     void shouldRetryScan_whenFileStatusIsError() {
         //given
         fileMetadata.setScanStatus(ScanStatus.ERROR);
+        fileMetadata.setRetryCount(4);
         when(fileMetadataRepository.findById(fileMetadata.getId()))
                 .thenReturn(Optional.of(fileMetadata));
 
@@ -108,6 +109,7 @@ class AdminFileServiceTest {
 
         //then
         assertThat(result.scanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
+        assertThat(fileMetadata.getRetryCount()).isZero();
         verify(fileMetadataRepository).save(fileMetadata);
         verify(outboxService).saveFileUploadEvent(fileMetadata, fileMetadata.getUser().getId());
     }
