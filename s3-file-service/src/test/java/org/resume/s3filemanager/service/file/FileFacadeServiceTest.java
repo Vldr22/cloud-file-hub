@@ -20,6 +20,7 @@ import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
 import org.resume.s3filemanager.enums.UserRole;
+import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.*;
 import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.mapper.FileMapperImpl;
@@ -44,7 +45,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("FileFacadeService — координация загрузки, скачивания и удаления файлов")
+@DisplayName("FileFacadeService - координация загрузки, скачивания и удаления файлов")
 class FileFacadeServiceTest {
 
     private static final Faker FAKER = new Faker();
@@ -106,11 +107,10 @@ class FileFacadeServiceTest {
 
     // uploadFile
 
-    /**
-     * Успешная загрузка: файл в S3, в ответе файл со статусом PENDING_SCAN.
-     */
     @Test
+    @DisplayName("Загружает файл в S3 и возвращает ответ со статусом PENDING_SCAN")
     void shouldUploadFile_whenAllChecksPass() {
+        //given
         String fileHash = FAKER.internet().uuid();
         FileMetadata saved = buildFileMetadata();
 
@@ -119,54 +119,56 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(PDF_TYPE), eq(user)))
                 .thenReturn(saved);
 
+        //when
         FileResponse response = fileFacadeService.uploadFile(validPdfFile, authenticatedUser);
 
+        //then
         assertThat(response.uniqueName()).isEqualTo(saved.getUniqueName());
         assertThat(response.scanStatus()).isEqualTo(ScanStatus.PENDING_SCAN);
         verify(fileStorageService).uploadFileYandexS3(anyString(), any(), eq(PDF_TYPE));
         verify(fileMetadataService).saveFileWithOutboxEvent(any(), anyString(), eq(fileHash), eq(PDF_TYPE), eq(user));
     }
 
-    /**
-     * Нет прав на загрузку: FileUploadLimitException до обращения к S3.
-     */
     @Test
+    @DisplayName("Бросает FileUploadLimitException до обращения к S3, когда нет прав на загрузку")
     void shouldThrowFileUploadLimitException_whenUserHasNoUploadPermission() {
+        //given
         when(filePermissionService.checkUploadPermission(authenticatedUser))
                 .thenThrow(new FileUploadLimitException());
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile, authenticatedUser))
                 .isInstanceOf(FileUploadLimitException.class);
 
         verifyNoInteractions(fileStorageService, fileMetadataService);
     }
 
-    /**
-     * Дубликат файла: DuplicateFileException до загрузки в S3.
-     */
     @Test
+    @DisplayName("Бросает DuplicateFileException до загрузки в S3 при дубликате файла")
     void shouldThrowDuplicateFileException_whenFileHashAlreadyExists() {
+        //given
         when(filePermissionService.checkUploadPermission(authenticatedUser)).thenReturn(user);
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
         doThrow(new DuplicateFileException())
                 .when(fileHashService).checkDuplicateInDatabase(anyString(), any());
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile, authenticatedUser))
                 .isInstanceOf(DuplicateFileException.class);
 
         verifyNoInteractions(fileStorageService, fileMetadataService);
     }
 
-    /**
-     * Ошибка сохранения в БД: файл удаляется из S3.
-     */
     @Test
+    @DisplayName("Удаляет файл из S3 при ошибке сохранения в БД")
     void shouldRollbackS3Upload_whenDatabaseSaveFails() {
+        //given
         when(filePermissionService.checkUploadPermission(authenticatedUser)).thenReturn(user);
         when(fileHashService.calculateMD5(any())).thenReturn(FAKER.internet().uuid());
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), anyString(), eq(user)))
                 .thenThrow(new RuntimeException());
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.uploadFile(validPdfFile, authenticatedUser))
                 .isInstanceOf(RuntimeException.class);
 
@@ -176,17 +178,16 @@ class FileFacadeServiceTest {
 
     // multipleUpload
 
-    /**
-     * Пакетная загрузка: валидный файл загружается, невалидный отклоняется с сообщением валидации.
-     */
     @Test
+    @DisplayName("Загружает валидный файл и отклоняет невалидный с сообщением валидации")
     void shouldReturnPartialSuccess_whenOneFileIsInvalidAndOneIsValid() {
+        //given
         MockMultipartFile invalidFile = new MockMultipartFile(
                 "file",
                 FAKER.file().fileName(null, null, "exe", null),
                 "application/x-msdownload",
-                FAKER.lorem().characters(5).getBytes())
-                ;
+                FAKER.lorem().characters(5).getBytes());
+
         String validationError = String.format(
                 ValidationMessages.FILE_TYPE_NOT_ALLOWED, "exe", "application/x-msdownload");
 
@@ -199,9 +200,11 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), anyString(), eq(user)))
                 .thenReturn(saved);
 
+        //when
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
                 new MultipartFile[]{validPdfFile, invalidFile}, authenticatedUser);
 
+        //then
         assertThat(results).hasSize(2);
         assertThat(results.get(0).status()).isEqualTo(CommonResponseStatus.SUCCESS);
         assertThat(results.get(1).status()).isEqualTo(CommonResponseStatus.ERROR);
@@ -210,11 +213,10 @@ class FileFacadeServiceTest {
         verify(fileStorageService).uploadFileYandexS3(anyString(), any(), anyString());
     }
 
-    /**
-     * Все файлы провалились: MultipleFileUploadException со списком результатов.
-     */
     @Test
+    @DisplayName("Бросает MultipleFileUploadException со списком результатов, когда все файлы провалились")
     void shouldThrowMultipleFileUploadException_whenAllFilesFail() {
+        //given
         String validationError = String.format(ValidationMessages.FILE_TYPE_NOT_ALLOWED, "exe", "application/x-msdownload");
         MockMultipartFile file1 = new MockMultipartFile(
                 "file",
@@ -231,6 +233,7 @@ class FileFacadeServiceTest {
         when(filePermissionService.checkUploadPermission(authenticatedUser)).thenReturn(user);
         when(fileValidator.validateFile(any())).thenReturn(Optional.of(validationError));
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.multipleUpload(new MultipartFile[]{file1, file2}, authenticatedUser))
                 .isInstanceOf(MultipleFileUploadException.class)
                 .satisfies(ex -> {
@@ -242,11 +245,10 @@ class FileFacadeServiceTest {
         verifyNoInteractions(fileStorageService);
     }
 
-    /**
-     * Дубликат в пакетной загрузке получает ERROR, второй файл загружается.
-     */
     @Test
+    @DisplayName("Отмечает дубликат ошибкой в пакетной загрузке, второй файл загружается")
     void shouldMarkFileAsError_whenDuplicateDetectedDuringBatchUpload() {
+        //given
         MockMultipartFile duplicate = new MockMultipartFile(
                 "file",
                 FAKER.file().fileName(null, null, "pdf", null),
@@ -264,20 +266,21 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), anyString(), eq(user)))
                 .thenReturn(saved);
 
+        //when
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
                 new MultipartFile[]{duplicate, validPdfFile}, authenticatedUser);
 
+        //then
         assertThat(results).hasSize(2);
         assertThat(results.get(0).status()).isEqualTo(CommonResponseStatus.ERROR);
         assertThat(results.get(0).message()).isEqualTo(ErrorMessages.FILE_ALREADY_BEEN_UPLOADED);
         assertThat(results.get(1).status()).isEqualTo(CommonResponseStatus.SUCCESS);
     }
 
-    /**
-     * Ошибка S3 в пакетной загрузке: файл получает FILE_STORAGE_ERROR.
-     */
     @Test
+    @DisplayName("Отмечает файл ошибкой FILE_STORAGE_ERROR при сбое S3 в пакетной загрузке")
     void shouldMarkFileAsError_whenS3FailsDuringBatchUpload() {
+        //given
         MockMultipartFile secondFile = new MockMultipartFile(
                 "file",
                 FAKER.file().fileName(null, null, "pdf", null),
@@ -294,19 +297,20 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), anyString(), eq(user)))
                 .thenReturn(buildFileMetadata());
 
+        //when
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
                 new MultipartFile[]{validPdfFile, secondFile}, authenticatedUser);
 
+        //then
         assertThat(results.get(0).status()).isEqualTo(CommonResponseStatus.ERROR);
         assertThat(results.get(0).message()).isEqualTo(ErrorMessages.FILE_STORAGE_ERROR);
         assertThat(results.get(1).status()).isEqualTo(CommonResponseStatus.SUCCESS);
     }
 
-    /**
-     * Ошибка чтения файла в пакетной загрузке: FILE_READ_ERROR.
-     */
     @Test
+    @DisplayName("Отмечает файл ошибкой FILE_READ_ERROR при сбое чтения в пакетной загрузке")
     void shouldMarkFileAsError_whenFileReadFailsDuringBatchUpload() throws Exception {
+        //given
         MockMultipartFile unreadableFile = mock(MockMultipartFile.class);
         when(unreadableFile.getOriginalFilename()).thenReturn("broken.pdf");
         when(unreadableFile.getBytes()).thenThrow(new java.io.IOException());
@@ -316,22 +320,22 @@ class FileFacadeServiceTest {
         when(fileMetadataService.saveFileWithOutboxEvent(any(), anyString(), anyString(), anyString(), eq(user)))
                 .thenReturn(buildFileMetadata());
 
+        //when
         List<MultipleUploadResponse> results = fileFacadeService.multipleUpload(
                 new MultipartFile[]{unreadableFile, validPdfFile}, authenticatedUser);
 
+        //then
         assertThat(results.get(0).status()).isEqualTo(CommonResponseStatus.ERROR);
         assertThat(results.get(0).message()).isEqualTo(ErrorMessages.FILE_READ_ERROR);
         assertThat(results.get(1).status()).isEqualTo(CommonResponseStatus.SUCCESS);
     }
 
-
     // downloadFile
 
-    /**
-     * Успешное скачивание: байты файла и имя, закодированное для заголовка.
-     */
     @Test
+    @DisplayName("Возвращает байты файла и закодированное имя при успешном скачивании")
     void shouldReturnFileContent_whenFileExistsInStorage() {
+        //given
         byte[] content = FAKER.lorem().characters(20).getBytes();
         String uniqueName = FAKER.internet().uuid() + ".pdf";
         FileMetadata metadata = buildFileMetadataWithName("example.pdf");
@@ -340,8 +344,10 @@ class FileFacadeServiceTest {
         when(fileStorageService.downloadFileYandexS3(uniqueName)).thenReturn(content);
         when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
 
+        //when
         FileDownloadResponse response = fileFacadeService.downloadFile(uniqueName);
 
+        //then
         assertThat(response.getContent()).isEqualTo(content);
         assertThat(response.getContentType()).isEqualTo("application/pdf");
         assertThat(response.getSize()).isEqualTo(content.length);
@@ -351,25 +357,24 @@ class FileFacadeServiceTest {
         verify(fileMetadataService).findByUniqueName(uniqueName);
     }
 
-    /**
-     * Файла нет в БД: FileNotFoundException.
-     */
     @Test
+    @DisplayName("Бросает FileNotFoundException, когда файла нет в БД")
     void shouldThrowFileNotFoundException_whenMetadataNotFound() {
+        //given
         String uniqueName = FAKER.internet().uuid() + ".pdf";
 
         when(fileMetadataService.findByUniqueName(uniqueName))
                 .thenThrow(new FileNotFoundException(uniqueName));
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
                 .isInstanceOf(FileNotFoundException.class);
     }
 
-    /**
-     * Файл есть в БД, но отсутствует в S3: FileNotFoundException.
-     */
     @Test
+    @DisplayName("Бросает FileNotFoundException, когда файл есть в БД, но отсутствует в S3")
     void shouldThrowFileNotFoundException_whenFileNotInS3() {
+        //given
         String uniqueName = FAKER.internet().uuid() + ".pdf";
         FileMetadata metadata = buildFileMetadataWithName("example.pdf");
         metadata.setScanStatus(ScanStatus.CLEAN);
@@ -378,22 +383,46 @@ class FileFacadeServiceTest {
         when(fileStorageService.downloadFileYandexS3(uniqueName))
                 .thenThrow(new FileNotFoundException(uniqueName));
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
                 .isInstanceOf(FileNotFoundException.class);
     }
 
-    /**
-     * Файл не прошёл антивирусную проверку: FileNotAvailableException, S3 не вызывается.
-     */
     @Test
+    @DisplayName("Бросает FileNotAvailableException и не обращается к S3, когда файл не CLEAN")
     void shouldThrowFileNotAvailableException_whenFileIsNotClean() {
+        //given
         String uniqueName = FAKER.internet().uuid() + ".pdf";
         FileMetadata metadata = buildFileMetadataWithName("example.pdf");
 
         when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
 
+        //when //then
         assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
                 .isInstanceOf(FileNotAvailableException.class);
+
+        verifyNoInteractions(fileStorageService);
+    }
+
+    @Test
+    @DisplayName("Бросает FileNotFoundException и не обращается к S3, когда владелец заблокирован")
+    void shouldThrowFileNotFoundException_whenOwnerIsBlocked() {
+        //given
+        String uniqueName = FAKER.internet().uuid() + ".pdf";
+        FileMetadata metadata = buildFileMetadataWithName("example.pdf");
+        metadata.setScanStatus(ScanStatus.CLEAN);
+
+        User blockedOwner = new User();
+        blockedOwner.setId(FAKER.number().randomNumber());
+        blockedOwner.setUsername(FAKER.name().username());
+        blockedOwner.setStatus(UserStatus.BLOCKED);
+        metadata.setUser(blockedOwner);
+
+        when(fileMetadataService.findByUniqueName(uniqueName)).thenReturn(metadata);
+
+        //when //then
+        assertThatThrownBy(() -> fileFacadeService.downloadFile(uniqueName))
+                .isInstanceOf(FileNotFoundException.class);
 
         verifyNoInteractions(fileStorageService);
     }
@@ -455,6 +484,8 @@ class FileFacadeServiceTest {
         verifyNoInteractions(fileStorageService);
         verify(fileMetadataService, never()).deleteFileAndUpdateUserStatus(any());
     }
+
+    // helpers
 
     private FileMetadata buildFileMetadata() {
         return buildFileMetadataWithName(FAKER.file().fileName(

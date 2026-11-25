@@ -13,6 +13,7 @@ import org.resume.s3filemanager.dto.MultipleUploadResponse;
 import org.resume.s3filemanager.entity.FileMetadata;
 import org.resume.s3filemanager.entity.User;
 import org.resume.s3filemanager.enums.CommonResponseStatus;
+import org.resume.s3filemanager.enums.UserStatus;
 import org.resume.s3filemanager.exception.*;
 import org.resume.s3filemanager.mapper.FileMapper;
 import org.resume.s3filemanager.security.AuthenticatedUser;
@@ -91,6 +92,7 @@ public class FileFacadeService {
 
     /**
      * Скачивает файл, прошедший антивирусную проверку.
+     * Файл заблокированного владельца не отдаётся - 404, как если бы файла не существовало.
      *
      * @throws FileNotFoundException     если файл не найден
      * @throws FileNotAvailableException если статус проверки не CLEAN
@@ -98,6 +100,10 @@ public class FileFacadeService {
     @Auditable(operation = AuditOperation.FILE_DOWNLOAD, resourceType = ResourceType.FILE)
     public FileDownloadResponse downloadFile(String uniqueName) {
         FileMetadata metadata = fileMetadataService.findByUniqueName(uniqueName);
+
+        if (metadata.getUser().getStatus() == UserStatus.BLOCKED) {
+            throw new FileNotFoundException(uniqueName);
+        }
 
         if (metadata.getScanStatus() != ScanStatus.CLEAN) {
             throw new FileNotAvailableException(metadata.getScanStatus());
